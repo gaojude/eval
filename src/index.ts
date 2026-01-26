@@ -42,3 +42,15 @@ export {
   getFixtureFiles,
   readFixtureFiles,
 } from './lib/fixture.js';
+
+// Re-export sandbox utilities
+export type { SandboxOptions, CommandResult, SandboxFile } from './lib/sandbox.js';
+export {
+  SandboxManager,
+  DEFAULT_SANDBOX_TIMEOUT,
+  IGNORED_PATTERNS,
+  TEST_FILE_PATTERNS,
+  collectLocalFiles,
+  splitTestFiles,
+  verifyNoTestFiles,
+} from './lib/sandbox.js';
