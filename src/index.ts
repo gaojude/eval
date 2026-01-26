@@ -54,3 +54,7 @@ export {
   splitTestFiles,
   verifyNoTestFiles,
 } from './lib/sandbox.js';
+
+// Re-export agent utilities
+export type { AgentRunOptions, AgentRunResult } from './lib/agent.js';
+export { runAgent, getModelId } from './lib/agent.js';
