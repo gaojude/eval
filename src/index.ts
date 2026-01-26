@@ -58,3 +58,19 @@ export {
 // Re-export agent utilities
 export type { AgentRunOptions, AgentRunResult } from './lib/agent.js';
 export { runAgent, getModelId } from './lib/agent.js';
+
+// Re-export results utilities
+export type { SaveResultsOptions } from './lib/results.js';
+export {
+  agentResultToEvalResult,
+  createEvalSummary,
+  createExperimentResults,
+  saveResults,
+  formatResultsTable,
+  formatRunResult,
+  createProgressDisplay,
+} from './lib/results.js';
+
+// Re-export runner utilities
+export type { RunExperimentOptions } from './lib/runner.js';
+export { runExperiment, runSingleEval } from './lib/runner.js';

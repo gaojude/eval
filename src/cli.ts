@@ -12,6 +12,8 @@ import chalk from 'chalk';
 import { loadConfig } from './lib/config.js';
 import { loadAllFixtures, discoverFixtures } from './lib/fixture.js';
 import { resolveEvalNames } from './lib/config.js';
+import { runExperiment } from './lib/runner.js';
+import { basename } from 'path';
 
 // Load environment variables
 dotenvConfig();
@@ -108,8 +110,36 @@ program
         return;
       }
 
-      // TODO: Implement actual eval execution
-      console.log(chalk.yellow('\nEval execution not yet implemented'));
+      // Check for required API key
+      const apiKey = process.env.ANTHROPIC_API_KEY;
+      if (!apiKey) {
+        console.error(chalk.red('ANTHROPIC_API_KEY environment variable is required'));
+        process.exit(1);
+      }
+
+      // Filter fixtures to only the ones we want to run
+      const selectedFixtures = fixtures.filter((f) => evalNames.includes(f.name));
+
+      // Get experiment name from config file
+      const experimentName = basename(configPath, '.ts').replace(/\.js$/, '');
+      const resultsDir = resolve(dirname(absoluteConfigPath), options.resultsDir);
+
+      console.log(chalk.blue('\nStarting experiment...'));
+
+      // Run the experiment
+      const results = await runExperiment({
+        config,
+        fixtures: selectedFixtures,
+        apiKey,
+        resultsDir,
+        experimentName,
+        onProgress: (msg) => console.log(msg),
+        verbose: options.verbose,
+      });
+
+      // Exit with appropriate code
+      const allPassed = results.evals.every((e) => e.passedRuns === e.totalRuns);
+      process.exit(allPassed ? 0 : 1);
     } catch (error) {
       if (error instanceof Error) {
         console.error(chalk.red(`Error: ${error.message}`));
