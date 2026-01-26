@@ -1,0 +1,168 @@
+#!/usr/bin/env node
+
+/**
+ * CLI entry point for the eval framework.
+ */
+
+import { Command } from 'commander';
+import { config as dotenvConfig } from 'dotenv';
+import { resolve, dirname } from 'path';
+import { existsSync } from 'fs';
+import chalk from 'chalk';
+import { loadConfig } from './lib/config.js';
+import { loadAllFixtures, discoverFixtures } from './lib/fixture.js';
+import { resolveEvalNames } from './lib/config.js';
+
+// Load environment variables
+dotenvConfig();
+
+const program = new Command();
+
+program
+  .name('eval')
+  .description('Framework for testing AI coding agents in isolated sandboxes')
+  .version('0.1.0');
+
+/**
+ * init command - Create a new eval project
+ */
+program
+  .command('init')
+  .argument('<name>', 'Name of the project to create')
+  .description('Create a new eval project with example fixtures')
+  .action(async (name: string) => {
+    console.log(chalk.blue(`Creating new eval project: ${name}`));
+    // TODO: Implement init command
+    console.log(chalk.yellow('init command not yet implemented'));
+  });
+
+/**
+ * run command - Run experiments
+ */
+program
+  .command('run')
+  .argument('<config>', 'Path to experiment configuration file')
+  .option('--evals-dir <dir>', 'Directory containing eval fixtures', 'evals')
+  .option('--results-dir <dir>', 'Directory to store results', 'results')
+  .option('--dry', 'Dry run without actually executing agent')
+  .option('--verbose', 'Enable verbose output')
+  .description('Run an experiment')
+  .action(async (configPath: string, options) => {
+    try {
+      const absoluteConfigPath = resolve(process.cwd(), configPath);
+
+      if (!existsSync(absoluteConfigPath)) {
+        console.error(chalk.red(`Config file not found: ${absoluteConfigPath}`));
+        process.exit(1);
+      }
+
+      console.log(chalk.blue(`Loading config from ${configPath}...`));
+      const config = await loadConfig(absoluteConfigPath);
+
+      if (options.verbose) {
+        console.log(chalk.gray('Resolved configuration:'));
+        console.log(chalk.gray(JSON.stringify(config, null, 2)));
+      }
+
+      // Discover evals
+      const evalsDir = resolve(dirname(absoluteConfigPath), options.evalsDir);
+      if (!existsSync(evalsDir)) {
+        console.error(chalk.red(`Evals directory not found: ${evalsDir}`));
+        process.exit(1);
+      }
+
+      console.log(chalk.blue(`Discovering evals in ${evalsDir}...`));
+      const { fixtures, errors } = loadAllFixtures(evalsDir);
+
+      if (errors.length > 0) {
+        console.log(chalk.yellow(`\nWarning: ${errors.length} invalid fixture(s):`));
+        for (const error of errors) {
+          console.log(chalk.yellow(`  - ${error.fixtureName}: ${error.message}`));
+        }
+      }
+
+      if (fixtures.length === 0) {
+        console.error(chalk.red('No valid eval fixtures found'));
+        process.exit(1);
+      }
+
+      // Resolve which evals to run
+      const availableNames = fixtures.map((f) => f.name);
+      const evalNames = resolveEvalNames(config.evals, availableNames);
+
+      if (evalNames.length === 0) {
+        console.error(chalk.red('No evals matched the filter'));
+        process.exit(1);
+      }
+
+      console.log(chalk.green(`\nFound ${fixtures.length} valid fixture(s), will run ${evalNames.length}:`));
+      for (const name of evalNames) {
+        console.log(chalk.green(`  - ${name}`));
+      }
+
+      console.log(chalk.blue(`\nRunning ${evalNames.length} eval(s) x ${config.runs} run(s) = ${evalNames.length * config.runs} total runs`));
+      console.log(chalk.blue(`Model: ${config.model}, Timeout: ${config.timeout}s, Early Exit: ${config.earlyExit}`));
+
+      if (options.dry) {
+        console.log(chalk.yellow('\n[DRY RUN] Would execute evals here'));
+        return;
+      }
+
+      // TODO: Implement actual eval execution
+      console.log(chalk.yellow('\nEval execution not yet implemented'));
+    } catch (error) {
+      if (error instanceof Error) {
+        console.error(chalk.red(`Error: ${error.message}`));
+      } else {
+        console.error(chalk.red('An unknown error occurred'));
+      }
+      process.exit(1);
+    }
+  });
+
+/**
+ * list command - List available evals
+ */
+program
+  .command('list')
+  .option('--evals-dir <dir>', 'Directory containing eval fixtures', 'evals')
+  .description('List available eval fixtures')
+  .action(async (options) => {
+    try {
+      const evalsDir = resolve(process.cwd(), options.evalsDir);
+
+      if (!existsSync(evalsDir)) {
+        console.error(chalk.red(`Evals directory not found: ${evalsDir}`));
+        process.exit(1);
+      }
+
+      const { fixtures, errors } = loadAllFixtures(evalsDir);
+
+      if (fixtures.length > 0) {
+        console.log(chalk.green(`\nValid eval fixtures (${fixtures.length}):`));
+        for (const fixture of fixtures) {
+          const promptPreview = fixture.prompt.slice(0, 60).replace(/\n/g, ' ');
+          console.log(chalk.green(`  ${fixture.name}`));
+          console.log(chalk.gray(`    ${promptPreview}${fixture.prompt.length > 60 ? '...' : ''}`));
+        }
+      }
+
+      if (errors.length > 0) {
+        console.log(chalk.yellow(`\nInvalid fixtures (${errors.length}):`));
+        for (const error of errors) {
+          console.log(chalk.yellow(`  ${error.fixtureName}: ${error.message}`));
+        }
+      }
+
+      if (fixtures.length === 0 && errors.length === 0) {
+        console.log(chalk.gray('No eval fixtures found'));
+      }
+    } catch (error) {
+      if (error instanceof Error) {
+        console.error(chalk.red(`Error: ${error.message}`));
+      }
+      process.exit(1);
+    }
+  });
+
+program.parse();

@@ -30,3 +30,15 @@ export {
   loadConfig,
   resolveEvalNames,
 } from './lib/config.js';
+
+// Re-export fixture utilities
+export {
+  FixtureValidationError,
+  discoverFixtures,
+  validateFixtureFiles,
+  validatePackageJson,
+  loadFixture,
+  loadAllFixtures,
+  getFixtureFiles,
+  readFixtureFiles,
+} from './lib/fixture.js';
