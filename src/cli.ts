@@ -13,6 +13,7 @@ import { loadConfig } from './lib/config.js';
 import { loadAllFixtures, discoverFixtures } from './lib/fixture.js';
 import { resolveEvalNames } from './lib/config.js';
 import { runExperiment } from './lib/runner.js';
+import { initProject, getPostInitInstructions } from './lib/init.js';
 import { basename } from 'path';
 
 // Load environment variables
@@ -33,9 +34,24 @@ program
   .argument('<name>', 'Name of the project to create')
   .description('Create a new eval project with example fixtures')
   .action(async (name: string) => {
-    console.log(chalk.blue(`Creating new eval project: ${name}`));
-    // TODO: Implement init command
-    console.log(chalk.yellow('init command not yet implemented'));
+    try {
+      console.log(chalk.blue(`Creating new eval project: ${name}`));
+
+      const projectDir = initProject({
+        name,
+        targetDir: process.cwd(),
+      });
+
+      console.log(chalk.green('Project created successfully!'));
+      console.log(getPostInitInstructions(projectDir, name));
+    } catch (error) {
+      if (error instanceof Error) {
+        console.error(chalk.red(`Error: ${error.message}`));
+      } else {
+        console.error(chalk.red('An unknown error occurred'));
+      }
+      process.exit(1);
+    }
   });
 
 /**

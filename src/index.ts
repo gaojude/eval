@@ -74,3 +74,7 @@ export {
 // Re-export runner utilities
 export type { RunExperimentOptions } from './lib/runner.js';
 export { runExperiment, runSingleEval } from './lib/runner.js';
+
+// Re-export init utilities
+export type { InitOptions } from './lib/init.js';
+export { initProject, getPostInitInstructions } from './lib/init.js';
