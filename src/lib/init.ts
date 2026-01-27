@@ -34,8 +34,8 @@ function getPackageJson(projectName: string): string {
       private: true,
       type: 'module',
       scripts: {
-        eval: 'npx eval run experiments/default.ts',
-        'eval:list': 'npx eval list',
+        eval: 'npx aieval run experiments/default.ts',
+        'eval:list': 'npx aieval list',
       },
       devDependencies: {
         '@judegao/eval': '^0.1.0',

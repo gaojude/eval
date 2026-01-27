@@ -1,12 +1,12 @@
 {
   "name": "@judegao/eval",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Framework for testing AI coding agents in isolated sandboxes",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
-    "eval": "dist/cli.js"
+    "aieval": "dist/cli.js"
   },
   "files": [
     "dist",

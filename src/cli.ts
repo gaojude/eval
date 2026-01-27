@@ -20,7 +20,7 @@ dotenvConfig();
 const program = new Command();
 
 program
-  .name('eval')
+  .name('aieval')
   .description('Framework for testing AI coding agents in isolated sandboxes')
   .version('0.1.0');
 
