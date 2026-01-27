@@ -51,7 +51,7 @@ describe('CLI', () => {
 
     it('shows version with --version flag', () => {
       const result = runCli(['--version']);
-      expect(result.stdout).toContain('0.1.7');
+      expect(result.stdout).toContain('0.1.8');
     });
   });
 
