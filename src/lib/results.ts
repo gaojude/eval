@@ -7,6 +7,7 @@ import { join } from 'path';
 import chalk from 'chalk';
 import type {
   EvalRunResult,
+  EvalRunData,
   EvalSummary,
   ExperimentResults,
   ResolvedExperimentConfig,
@@ -14,26 +15,19 @@ import type {
 import type { AgentRunResult } from './agent.js';
 
 /**
- * Convert AgentRunResult to EvalRunResult.
+ * Convert AgentRunResult to EvalRunData (result + transcript).
  */
-export function agentResultToEvalResult(agentResult: AgentRunResult): EvalRunResult {
+export function agentResultToEvalRunData(agentResult: AgentRunResult): EvalRunData {
   return {
-    status: agentResult.success ? 'passed' : 'failed',
-    failedStep: agentResult.error
-      ? determineFailedStep(agentResult)
-      : undefined,
-    error: agentResult.error,
-    duration: agentResult.duration / 1000, // Convert to seconds
-    agentOutput: agentResult.output,
-    scriptResults: [
-      ...(agentResult.buildSuccess !== undefined
-        ? [{ name: 'build', success: agentResult.buildSuccess, output: agentResult.buildOutput }]
-        : []),
-      ...(agentResult.lintSuccess !== undefined
-        ? [{ name: 'lint', success: agentResult.lintSuccess, output: agentResult.lintOutput }]
-        : []),
-    ],
-    testOutput: agentResult.testOutput,
+    result: {
+      status: agentResult.success ? 'passed' : 'failed',
+      failedStep: agentResult.error
+        ? determineFailedStep(agentResult)
+        : undefined,
+      error: agentResult.error,
+      duration: agentResult.duration / 1000, // Convert to seconds
+    },
+    transcript: agentResult.transcript,
   };
 }
 
@@ -59,9 +53,10 @@ function determineFailedStep(
 }
 
 /**
- * Create a summary from multiple run results.
+ * Create a summary from multiple run data.
  */
-export function createEvalSummary(name: string, runs: EvalRunResult[]): EvalSummary {
+export function createEvalSummary(name: string, runData: EvalRunData[]): EvalSummary {
+  const runs = runData.map((r) => r.result);
   const passedRuns = runs.filter((r) => r.status === 'passed').length;
   const totalDuration = runs.reduce((sum, r) => sum + r.duration, 0);
 
@@ -71,7 +66,7 @@ export function createEvalSummary(name: string, runs: EvalRunResult[]): EvalSumm
     passedRuns,
     passRate: runs.length > 0 ? (passedRuns / runs.length) * 100 : 0,
     meanDuration: runs.length > 0 ? totalDuration / runs.length : 0,
-    runs,
+    runs: runData,
   };
 }
 
@@ -105,13 +100,15 @@ export interface SaveResultsOptions {
 /**
  * Save experiment results to disk.
  *
- * Creates a directory structure like:
+ * Creates a directory structure per design:
  * results/
  *   experiment-name/
  *     2024-01-26T12-00-00Z/
  *       eval-1/
  *         run-1/
  *           result.json
+ *           transcript.jsonl
+ *           outputs/
  *         summary.json
  *       experiment.json
  */
@@ -136,21 +133,37 @@ export function saveResults(
     const evalDir = join(experimentDir, evalSummary.name);
     mkdirSync(evalDir, { recursive: true });
 
-    // Save summary
+    // Save summary (simplified format per design)
+    const summaryForFile = {
+      totalRuns: evalSummary.totalRuns,
+      passedRuns: evalSummary.passedRuns,
+      passRate: `${evalSummary.passRate.toFixed(0)}%`,
+      meanDuration: evalSummary.meanDuration,
+    };
     writeFileSync(
       join(evalDir, 'summary.json'),
-      JSON.stringify(evalSummary, null, 2)
+      JSON.stringify(summaryForFile, null, 2)
     );
 
     // Save individual run results
     for (let i = 0; i < evalSummary.runs.length; i++) {
+      const runData = evalSummary.runs[i];
       const runDir = join(evalDir, `run-${i + 1}`);
       mkdirSync(runDir, { recursive: true });
 
+      // Save result.json (just the result fields)
       writeFileSync(
         join(runDir, 'result.json'),
-        JSON.stringify(evalSummary.runs[i], null, 2)
+        JSON.stringify(runData.result, null, 2)
       );
+
+      // Save transcript.jsonl if available
+      if (runData.transcript) {
+        writeFileSync(join(runDir, 'transcript.jsonl'), runData.transcript);
+      }
+
+      // Create outputs/ directory
+      mkdirSync(join(runDir, 'outputs'), { recursive: true });
     }
   }
 

@@ -122,16 +122,16 @@ export interface EvalRunResult {
   error?: string;
   /** Duration in seconds */
   duration: number;
-  /** Raw output/transcript from the agent */
-  agentOutput?: string;
-  /** Individual script results */
-  scriptResults?: Array<{
-    name: string;
-    success: boolean;
-    output?: string;
-  }>;
-  /** Test output */
-  testOutput?: string;
+}
+
+/**
+ * Internal run data including transcript (not saved to result.json).
+ */
+export interface EvalRunData {
+  /** The eval result (saved to result.json) */
+  result: EvalRunResult;
+  /** Structured transcript from Claude Code (saved to transcript.jsonl) */
+  transcript?: string;
 }
 
 /**
@@ -148,8 +148,8 @@ export interface EvalSummary {
   passRate: number;
   /** Mean duration across all runs */
   meanDuration: number;
-  /** Individual run results */
-  runs: EvalRunResult[];
+  /** Individual run data (internal, not all fields saved to summary.json) */
+  runs: EvalRunData[];
 }
 
 /**

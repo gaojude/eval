@@ -34,8 +34,10 @@ export interface AgentRunOptions {
 export interface AgentRunResult {
   /** Whether the run was successful */
   success: boolean;
-  /** Raw output from the agent */
+  /** Raw output from the agent (stdout/stderr) */
   output: string;
+  /** Structured transcript from Claude Code (JSONL format) */
+  transcript?: string;
   /** Error message if failed */
   error?: string;
   /** Duration in milliseconds */
@@ -155,6 +157,9 @@ export default defineConfig({
 `,
     });
 
+    // Capture the Claude Code transcript
+    const transcript = await captureTranscript(sandbox);
+
     // Run validation scripts
     const validationResults = await runValidation(sandbox, options.scripts ?? []);
 
@@ -164,6 +169,7 @@ export default defineConfig({
     return {
       success: validationResults.allPassed,
       output: agentOutput,
+      transcript,
       duration: Date.now() - startTime,
       buildSuccess: validationResults.build?.success,
       lintSuccess: validationResults.lint?.success,
@@ -285,6 +291,36 @@ async function captureGeneratedFiles(sandbox: SandboxManager): Promise<Record<st
   }
 
   return files;
+}
+
+/**
+ * Capture the Claude Code transcript from the sandbox.
+ * Claude Code stores transcripts at ~/.claude/projects/-{workdir}/{session-id}.jsonl
+ */
+async function captureTranscript(sandbox: SandboxManager): Promise<string | undefined> {
+  try {
+    // Get the working directory to construct the transcript path
+    const workdir = sandbox.getWorkingDirectory();
+    // Claude Code uses the path with slashes replaced by dashes
+    const projectPath = workdir.replace(/\//g, '-');
+    const claudeProjectDir = `~/.claude/projects/${projectPath}`;
+
+    // Find the most recent .jsonl file (the transcript)
+    const findResult = await sandbox.runShell(
+      `ls -t ${claudeProjectDir}/*.jsonl 2>/dev/null | head -1`
+    );
+
+    if (findResult.exitCode !== 0 || !findResult.stdout.trim()) {
+      return undefined;
+    }
+
+    const transcriptPath = findResult.stdout.trim();
+    const content = await sandbox.readFile(transcriptPath);
+    return content;
+  } catch {
+    // Transcript capture is best-effort
+    return undefined;
+  }
 }
 
 /**

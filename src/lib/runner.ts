@@ -5,13 +5,13 @@
 import type {
   ResolvedExperimentConfig,
   EvalFixture,
-  EvalRunResult,
+  EvalRunData,
   EvalSummary,
   ExperimentResults,
 } from './types.js';
 import { runAgent } from './agent.js';
 import {
-  agentResultToEvalResult,
+  agentResultToEvalRunData,
   createEvalSummary,
   createExperimentResults,
   saveResults,
@@ -59,7 +59,7 @@ export async function runExperiment(
   };
 
   for (const fixture of fixtures) {
-    const runs: EvalRunResult[] = [];
+    const runDataList: EvalRunData[] = [];
 
     for (let i = 0; i < config.runs; i++) {
       log(createProgressDisplay(fixture.name, i + 1, config.runs));
@@ -73,19 +73,19 @@ export async function runExperiment(
         scripts: config.scripts,
       });
 
-      const evalResult = agentResultToEvalResult(agentResult);
-      runs.push(evalResult);
+      const runData = agentResultToEvalRunData(agentResult);
+      runDataList.push(runData);
 
-      log(formatRunResult(fixture.name, i + 1, config.runs, evalResult));
+      log(formatRunResult(fixture.name, i + 1, config.runs, runData.result));
 
       // Early exit if configured and we got a pass
-      if (config.earlyExit && evalResult.status === 'passed') {
+      if (config.earlyExit && runData.result.status === 'passed') {
         log(`Early exit: ${fixture.name} passed on run ${i + 1}`);
         break;
       }
     }
 
-    const summary = createEvalSummary(fixture.name, runs);
+    const summary = createEvalSummary(fixture.name, runDataList);
     evalSummaries.push(summary);
   }
 
@@ -117,7 +117,7 @@ export async function runSingleEval(
     scripts?: string[];
     verbose?: boolean;
   }
-): Promise<EvalRunResult> {
+): Promise<EvalRunData> {
   const agentResult = await runAgent(fixture.path, {
     prompt: fixture.prompt,
     model: options.model,
@@ -127,5 +127,5 @@ export async function runSingleEval(
     scripts: options.scripts,
   });
 
-  return agentResultToEvalResult(agentResult);
+  return agentResultToEvalRunData(agentResult);
 }

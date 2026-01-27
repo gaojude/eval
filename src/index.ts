@@ -15,6 +15,7 @@ export type {
   ResolvedExperimentConfig,
   EvalFixture,
   EvalRunResult,
+  EvalRunData,
   EvalSummary,
   ExperimentResults,
 } from './lib/types.js';
@@ -62,7 +63,7 @@ export { runAgent, getModelId } from './lib/agent.js';
 // Re-export results utilities
 export type { SaveResultsOptions } from './lib/results.js';
 export {
-  agentResultToEvalResult,
+  agentResultToEvalRunData,
   createEvalSummary,
   createExperimentResults,
   saveResults,
