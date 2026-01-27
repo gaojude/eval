@@ -281,8 +281,40 @@ results/
         summary.json       ← Pass rate, mean duration
         run-1/
           result.json      ← Individual run details
+          transcript.jsonl ← Agent conversation log
+          outputs/         ← Generated files
         run-2/
           result.json
+          transcript.jsonl
+          outputs/
+```
+
+### Result Files
+
+**result.json** - Execution metadata:
+```json
+{
+  "status": "failed",
+  "failedStep": "tests",
+  "error": "Test failed: expected 'Logout' to be in navbar",
+  "duration": 45.2
+}
+```
+
+**summary.json** - Aggregated stats:
+```json
+{
+  "totalRuns": 10,
+  "passedRuns": 7,
+  "passRate": "70%",
+  "meanDuration": 45.2
+}
+```
+
+**transcript.jsonl** - Agent conversation (one JSON object per line):
+```json
+{"role": "assistant", "content": "I'll add a logout button..."}
+{"role": "tool", "name": "write_file", "input": {"path": "src/Header.tsx"}}
 ```
 
 ### Interpreting Results
@@ -296,23 +328,15 @@ results/
 
 ### Debugging Failed Runs
 
-Check `results/<experiment>/<timestamp>/<eval>/run-N/result.json`:
+1. Check `result.json` for the `failedStep`:
+   - `setup`: npm install or setup function failed
+   - `agent`: Claude Code exited with error
+   - `scripts`: npm scripts (build, lint) failed
+   - `tests`: EVAL.ts tests failed
 
-```json
-{
-  "status": "failed",
-  "failedStep": "tests",
-  "error": "Test failed: expected 'Logout' to be in navbar",
-  "duration": 45.2,
-  "testOutput": "...",
-  "scriptResults": [...]
-}
-```
+2. Check `transcript.jsonl` to see what the agent did
 
-- `failedStep`: Where it failed — `setup`, `agent`, `scripts`, or `tests`
-- `error`: Error message
-- `testOutput`: Full vitest output
-- `scriptResults`: Output from each npm script
+3. Check `outputs/` for generated files
 
 ## Cost Estimation
 
