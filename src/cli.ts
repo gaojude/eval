@@ -80,8 +80,8 @@ program
         console.log(chalk.gray(JSON.stringify(config, null, 2)));
       }
 
-      // Discover evals
-      const evalsDir = resolve(dirname(absoluteConfigPath), options.evalsDir);
+      // Discover evals (resolve relative to cwd, not config file)
+      const evalsDir = resolve(process.cwd(), options.evalsDir);
       if (!existsSync(evalsDir)) {
         console.error(chalk.red(`Evals directory not found: ${evalsDir}`));
         process.exit(1);
