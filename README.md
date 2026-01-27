@@ -298,10 +298,10 @@ results/
   "failedStep": "tests",
   "error": "Test failed: expected 'Logout' to be in navbar",
   "duration": 45.2,
-  "transcriptPath": "transcript.jsonl",
+  "transcriptPath": "./transcript.jsonl",
   "outputPaths": {
-    "tests": "outputs/tests.txt",
-    "build": "outputs/build.txt"
+    "tests": "./outputs/tests.txt",
+    "build": "./outputs/build.txt"
   }
 }
 ```

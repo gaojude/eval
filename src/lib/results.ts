@@ -171,7 +171,7 @@ export function saveResults(
       // Save transcript.jsonl if available
       if (runData.transcript) {
         writeFileSync(join(runDir, 'transcript.jsonl'), runData.transcript);
-        resultWithPaths.transcriptPath = 'transcript.jsonl';
+        resultWithPaths.transcriptPath = './transcript.jsonl';
       }
 
       // Save script/test outputs to outputs/
@@ -185,7 +185,7 @@ export function saveResults(
           if (content) {
             const fileName = `${name}.txt`;
             writeFileSync(join(outputsDir, fileName), content);
-            outputPaths[name] = `outputs/${fileName}`;
+            outputPaths[name] = `./outputs/${fileName}`;
           }
         }
 

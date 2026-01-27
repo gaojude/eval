@@ -263,10 +263,10 @@ describe('results utilities', () => {
       expect(resultJson.status).toBe('passed');
       expect(resultJson.duration).toBe(10);
       // Should have paths to transcript and outputs
-      expect(resultJson.transcriptPath).toBe('transcript.jsonl');
+      expect(resultJson.transcriptPath).toBe('./transcript.jsonl');
       expect(resultJson.outputPaths).toEqual({
-        tests: 'outputs/tests.txt',
-        build: 'outputs/build.txt',
+        tests: './outputs/tests.txt',
+        build: './outputs/build.txt',
       });
       // Should NOT have raw content
       expect(resultJson.transcript).toBeUndefined();
