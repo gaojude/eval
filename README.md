@@ -48,13 +48,13 @@ Overall: 1/1 passed (100%)
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                     Your Eval Project                        │
+│                     Your Eval Project                       │
 ├─────────────────────────────────────────────────────────────┤
-│  experiments/                                                │
+│  experiments/                                               │
 │    default.ts          ← Experiment config (model, runs)    │
-│                                                              │
-│  evals/                                                      │
-│    add-feature/                                              │
+│                                                             │
+│  evals/                                                     │
+│    add-feature/                                             │
 │      PROMPT.md         ← Task description for the agent     │
 │      EVAL.ts           ← Test file (vitest) to verify work  │
 │      package.json      ← Dependencies for this eval         │
@@ -63,7 +63,7 @@ Overall: 1/1 passed (100%)
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                    Vercel Sandbox (isolated VM)              │
+│                    Vercel Sandbox (isolated VM)             │
 ├─────────────────────────────────────────────────────────────┤
 │  1. Upload starting code (agent can't see EVAL.ts)          │
 │  2. Run setup function (if configured)                      │
