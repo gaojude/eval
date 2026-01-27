@@ -38,8 +38,10 @@ function getPackageJson(projectName: string): string {
         'eval:list': 'npx agent-eval list',
       },
       devDependencies: {
-        '@judegao/eval': '^0.1.0',
+        '@judegao/eval': '^0.1.5',
+        '@types/node': '^22.0.0',
         typescript: '^5.6.0',
+        vitest: '^2.1.0',
       },
     },
     null,
@@ -165,6 +167,28 @@ function getExamplePackageJson(): string {
 }
 
 /**
+ * Get the root tsconfig.json for the project.
+ */
+function getRootTsconfig(): string {
+  return JSON.stringify(
+    {
+      compilerOptions: {
+        target: 'ES2022',
+        module: 'NodeNext',
+        moduleResolution: 'NodeNext',
+        strict: true,
+        skipLibCheck: true,
+        noEmit: true,
+        lib: ['ES2022'],
+      },
+      include: ['experiments'],
+    },
+    null,
+    2
+  );
+}
+
+/**
  * Get the example eval fixture tsconfig.json.
  */
 function getExampleTsconfig(): string {
@@ -209,6 +233,7 @@ export default App;
 function getTemplateFiles(projectName: string): TemplateFile[] {
   return [
     { path: 'package.json', content: getPackageJson(projectName) },
+    { path: 'tsconfig.json', content: getRootTsconfig() },
     { path: '.env.example', content: getEnvExample() },
     { path: '.gitignore', content: getGitignore() },
     { path: 'experiments/default.ts', content: getDefaultExperiment() },

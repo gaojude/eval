@@ -50,25 +50,25 @@ export interface ExperimentConfig {
   /** Which AI agent to use (currently only 'claude-code' supported) */
   agent: AgentType;
 
-  /** Which AI model the agent should use */
+  /** Which AI model the agent should use. @default 'opus' */
   model?: ModelTier;
 
-  /** Which evals to run. Can be a string, array, or filter function */
+  /** Which evals to run. Can be a string, array, or filter function. @default '*' (all evals) */
   evals?: string | string[] | EvalFilter;
 
-  /** How many times to run each eval */
+  /** How many times to run each eval. @default 1 */
   runs?: number;
 
-  /** Stop early after first success? */
+  /** Stop after first successful run? @default true */
   earlyExit?: boolean;
 
-  /** npm scripts that must pass after agent finishes */
+  /** npm scripts that must pass after agent finishes. @default [] */
   scripts?: string[];
 
-  /** Maximum time in seconds for agent to complete */
+  /** Maximum time in seconds for agent to complete. @default 300 (5 minutes) */
   timeout?: number;
 
-  /** Setup function that runs before agent starts */
+  /** Setup function that runs before agent starts. @default undefined */
   setup?: SetupFunction;
 }
 

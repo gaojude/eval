@@ -1,7 +1,13 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdirSync, rmSync, existsSync, readFileSync, readdirSync } from 'fs';
-import { join } from 'path';
+import { mkdirSync, rmSync, existsSync, readFileSync, writeFileSync } from 'fs';
+import { join, resolve, dirname } from 'path';
+import { execSync } from 'child_process';
+import { fileURLToPath } from 'url';
 import { initProject, getPostInitInstructions } from './init.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const PROJECT_ROOT = resolve(__dirname, '../..');
 
 const TEST_DIR = '/tmp/eval-framework-init-test';
 
@@ -122,6 +128,33 @@ describe('init utilities', () => {
       expect(content).toContain('node_modules');
       expect(content).toContain('.env');
       expect(content).toContain('results/');
+    });
+
+    it('passes TypeScript type checking after npm install', { timeout: 120000 }, () => {
+      const projectDir = initProject({
+        name: 'typecheck-test',
+        targetDir: TEST_DIR,
+      });
+
+      // For testing, link the local package instead of downloading from npm
+      // This allows the test to work before publishing
+      const pkgPath = join(projectDir, 'package.json');
+      const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'));
+      pkg.devDependencies['@judegao/eval'] = `file:${PROJECT_ROOT}`;
+      writeFileSync(pkgPath, JSON.stringify(pkg, null, 2));
+
+      // Install dependencies
+      execSync('npm install', {
+        cwd: projectDir,
+        stdio: 'pipe',
+      });
+
+      // Run type checker - this should pass without errors
+      // This catches issues like missing @types/node, vitest types, etc.
+      execSync('npx tsc --noEmit', {
+        cwd: projectDir,
+        stdio: 'pipe',
+      });
     });
   });
 
