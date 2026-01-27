@@ -2,7 +2,7 @@
  * Results storage and reporting for eval experiments.
  */
 
-import { mkdirSync, writeFileSync, existsSync } from 'fs';
+import { mkdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import chalk from 'chalk';
 import type {

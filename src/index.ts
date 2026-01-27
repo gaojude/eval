@@ -1,5 +1,5 @@
 /**
- * @vercel/eval-framework
+ * @judegao/eval
  *
  * Framework for testing AI coding agents in isolated sandboxes.
  */

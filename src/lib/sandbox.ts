@@ -263,6 +263,23 @@ export async function collectLocalFiles(
 }
 
 /**
+ * Check if a filename matches any of the test file patterns.
+ */
+function isTestFilePattern(filename: string): boolean {
+  for (const pattern of TEST_FILE_PATTERNS) {
+    if (pattern.startsWith('*.')) {
+      const ext = pattern.slice(1);
+      if (filename.endsWith(ext)) {
+        return true;
+      }
+    } else if (filename === pattern) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
  * Split files into workspace files (visible to agent) and test files (hidden until validation).
  */
 export function splitTestFiles(files: SandboxFile[]): {
@@ -274,12 +291,8 @@ export function splitTestFiles(files: SandboxFile[]): {
 
   for (const file of files) {
     const name = file.path.split('/').pop() ?? file.path;
-    const isTestFile =
-      name.endsWith('.test.tsx') ||
-      name.endsWith('.test.ts') ||
-      name === 'EVAL.ts';
 
-    if (isTestFile) {
+    if (isTestFilePattern(name)) {
       testFiles.push(file);
     } else {
       workspaceFiles.push(file);

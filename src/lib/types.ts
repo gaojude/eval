@@ -23,7 +23,11 @@ export type EvalFilter = (name: string) => boolean;
  */
 export interface Sandbox {
   /** Run a command in the sandbox */
-  runCommand(command: string, args?: string[]): Promise<{ stdout: string; stderr: string; exitCode: number }>;
+  runCommand(
+    command: string,
+    args?: string[],
+    options?: { env?: Record<string, string> }
+  ): Promise<{ stdout: string; stderr: string; exitCode: number }>;
   /** Read a file from the sandbox */
   readFile(path: string): Promise<string>;
   /** Write files to the sandbox */

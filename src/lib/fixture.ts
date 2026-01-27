@@ -5,7 +5,7 @@
 import { readFileSync, readdirSync, statSync, existsSync } from 'fs';
 import { join, resolve } from 'path';
 import type { EvalFixture } from './types.js';
-import { REQUIRED_EVAL_FILES } from './types.js';
+import { REQUIRED_EVAL_FILES, EXCLUDED_FILES } from './types.js';
 
 /**
  * Error thrown when an eval fixture is invalid.
@@ -169,7 +169,7 @@ export function loadAllFixtures(evalsDir: string): {
  */
 export function getFixtureFiles(
   fixturePath: string,
-  excludePatterns: readonly string[] = ['PROMPT.md', 'EVAL.ts', 'node_modules', '.git']
+  excludePatterns: readonly string[] = EXCLUDED_FILES
 ): string[] {
   const files: string[] = [];
 

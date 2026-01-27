@@ -8,7 +8,6 @@ import {
   collectLocalFiles,
   splitTestFiles,
   verifyNoTestFiles,
-  type SandboxFile,
 } from './sandbox.js';
 
 /**
@@ -271,8 +270,7 @@ async function captureGeneratedFiles(sandbox: SandboxManager): Promise<Record<st
     const filePaths = findResult.stdout
       .trim()
       .split('\n')
-      .filter(Boolean)
-      .filter((p) => !p.includes('node_modules'));
+      .filter(Boolean);
 
     for (const filePath of filePaths) {
       try {

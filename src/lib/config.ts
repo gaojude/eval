@@ -14,6 +14,7 @@ import type {
  */
 export const CONFIG_DEFAULTS = {
   model: 'opus' as const,
+  evals: '*' as const,
   runs: 1,
   earlyExit: true,
   scripts: [] as string[],
@@ -23,7 +24,7 @@ export const CONFIG_DEFAULTS = {
 /**
  * Zod schema for validating experiment configuration.
  */
-export const experimentConfigSchema = z.object({
+const experimentConfigSchema = z.object({
   agent: z.literal('claude-code'),
   model: z.enum(['opus', 'sonnet', 'haiku']).optional(),
   evals: z

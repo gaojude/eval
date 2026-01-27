@@ -1,5 +1,5 @@
 {
-  "name": "@vercel/eval-framework",
+  "name": "@judegao/eval",
   "version": "0.1.0",
   "description": "Framework for testing AI coding agents in isolated sandboxes",
   "type": "module",
@@ -47,5 +47,8 @@
     "agent",
     "sandbox"
   ],
-  "license": "MIT"
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  }
 }

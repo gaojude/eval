@@ -6,15 +6,13 @@
 
 import { Command } from 'commander';
 import { config as dotenvConfig } from 'dotenv';
-import { resolve, dirname } from 'path';
+import { resolve, dirname, basename } from 'path';
 import { existsSync } from 'fs';
 import chalk from 'chalk';
-import { loadConfig } from './lib/config.js';
-import { loadAllFixtures, discoverFixtures } from './lib/fixture.js';
-import { resolveEvalNames } from './lib/config.js';
+import { loadConfig, resolveEvalNames } from './lib/config.js';
+import { loadAllFixtures } from './lib/fixture.js';
 import { runExperiment } from './lib/runner.js';
 import { initProject, getPostInitInstructions } from './lib/init.js';
-import { basename } from 'path';
 
 // Load environment variables
 dotenvConfig();

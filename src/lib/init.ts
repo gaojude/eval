@@ -3,7 +3,7 @@
  */
 
 import { mkdirSync, writeFileSync, existsSync } from 'fs';
-import { join } from 'path';
+import { join, dirname } from 'path';
 
 /**
  * Options for initializing a new project.
@@ -38,7 +38,7 @@ function getPackageJson(projectName: string): string {
         'eval:list': 'npx eval list',
       },
       devDependencies: {
-        '@vercel/eval-framework': '^0.1.0',
+        '@judegao/eval': '^0.1.0',
         typescript: '^5.6.0',
       },
     },
@@ -80,7 +80,7 @@ results/
  * Get the default experiment configuration template.
  */
 function getDefaultExperiment(): string {
-  return `import type { ExperimentConfig } from '@vercel/eval-framework';
+  return `import type { ExperimentConfig } from '@judegao/eval';
 
 const config: ExperimentConfig = {
   // Which AI agent to use (currently only 'claude-code' supported)
@@ -239,7 +239,7 @@ export function initProject(options: InitOptions): string {
   const files = getTemplateFiles(options.name);
   for (const file of files) {
     const filePath = join(projectDir, file.path);
-    const fileDir = join(filePath, '..');
+    const fileDir = dirname(filePath);
 
     // Create parent directories
     mkdirSync(fileDir, { recursive: true });
@@ -265,6 +265,6 @@ Next steps:
   4. npm run eval
 
 For more information, see the documentation at:
-  https://github.com/vercel/eval-framework
+  https://github.com/gaojude/eval
 `;
 }
