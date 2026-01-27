@@ -34,7 +34,7 @@ function getPackageJson(projectName: string): string {
       private: true,
       type: 'module',
       scripts: {
-        eval: 'npx agent-eval run experiments/default.ts',
+        eval: 'npx agent-eval run experiments/default.ts --evals-dir ../evals',
         'eval:list': 'npx agent-eval list',
       },
       devDependencies: {
