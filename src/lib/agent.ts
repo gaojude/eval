@@ -143,6 +143,19 @@ IMPORTANT: Do not run npm, pnpm, yarn, or any package manager commands. Dependen
     // Upload test files for validation
     await sandbox.uploadFiles(testFiles);
 
+    // Create vitest config that includes EVAL.ts
+    await sandbox.writeFiles({
+      'vitest.config.ts': `
+import { defineConfig } from 'vitest/config';
+export default defineConfig({
+  test: {
+    include: ['EVAL.ts'],
+    globals: false,
+  },
+});
+`,
+    });
+
     // Run validation scripts
     const validationResults = await runValidation(sandbox, options.scripts ?? []);
 
@@ -208,8 +221,8 @@ async function runValidation(
     scripts: {},
   };
 
-  // Always run vitest for EVAL.ts
-  const testResult = await sandbox.runCommand('npx', ['vitest', 'run']);
+  // Always run vitest for EVAL.ts (explicitly specify the file)
+  const testResult = await sandbox.runCommand('npx', ['vitest', 'run', 'EVAL.ts']);
   results.test = {
     success: testResult.exitCode === 0,
     output: testResult.stdout + testResult.stderr,
