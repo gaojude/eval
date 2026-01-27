@@ -136,7 +136,7 @@ program
 
       // Get experiment name from config file
       const experimentName = basename(configPath, '.ts').replace(/\.js$/, '');
-      const resultsDir = resolve(dirname(absoluteConfigPath), options.resultsDir);
+      const resultsDir = resolve(process.cwd(), options.resultsDir);
 
       console.log(chalk.blue('\nStarting experiment...'));
 
