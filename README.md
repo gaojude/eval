@@ -160,12 +160,32 @@ agent-eval init <project-name>
 
 # Run evals
 agent-eval run experiments/default.ts
-agent-eval run experiments/default.ts --dry      # Preview without running
-agent-eval run experiments/default.ts --verbose  # Detailed output
 
 # List available evals
 agent-eval list
 ```
+
+### Options
+
+**`--dry`** - Preview what would run without actually executing. Use this to verify your setup before spending API credits:
+
+```bash
+agent-eval run experiments/default.ts --dry
+
+# Output:
+# Found 3 valid fixture(s), will run 3:
+#   - add-feature
+#   - fix-bug
+#   - refactor
+# Running 3 eval(s) x 10 run(s) = 30 total runs
+# Model: sonnet, Timeout: 300s
+# [DRY RUN] Would execute evals here
+```
+
+### Conventions
+
+- Evals live in `evals/`
+- Results are saved to `results/`
 
 ## Results
 

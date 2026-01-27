@@ -57,14 +57,19 @@ describe('CLI', () => {
 
   describe('list command', () => {
     it('shows error when evals directory does not exist', () => {
-      const result = runCli(['list', '--evals-dir', '/non/existent/path']);
+      // Run from a directory without evals/
+      const emptyDir = join(TEST_DIR, 'empty');
+      mkdirSync(emptyDir);
+      const result = runCli(['list'], emptyDir);
       expect(result.stderr).toContain('not found');
       expect(result.exitCode).toBe(1);
     });
 
     it('lists valid fixtures', () => {
-      // Create test evals directory
-      const evalsDir = join(TEST_DIR, 'evals');
+      // Create project with evals directory
+      const projectDir = join(TEST_DIR, 'project');
+      mkdirSync(projectDir);
+      const evalsDir = join(projectDir, 'evals');
       mkdirSync(evalsDir);
 
       // Create a valid fixture
@@ -74,14 +79,17 @@ describe('CLI', () => {
       writeFileSync(join(fixture1, 'EVAL.ts'), 'test code');
       writeFileSync(join(fixture1, 'package.json'), JSON.stringify({ type: 'module' }));
 
-      const result = runCli(['list', '--evals-dir', evalsDir]);
+      const result = runCli(['list'], projectDir);
       expect(result.stdout).toContain('add-button');
       expect(result.stdout).toContain('Add a button');
       expect(result.exitCode).toBe(0);
     });
 
     it('shows invalid fixtures as warnings', () => {
-      const evalsDir = join(TEST_DIR, 'evals');
+      // Create project with evals directory
+      const projectDir = join(TEST_DIR, 'project2');
+      mkdirSync(projectDir);
+      const evalsDir = join(projectDir, 'evals');
       mkdirSync(evalsDir);
 
       // Create an invalid fixture (missing EVAL.ts)
@@ -90,7 +98,7 @@ describe('CLI', () => {
       writeFileSync(join(fixture, 'PROMPT.md'), 'Task');
       writeFileSync(join(fixture, 'package.json'), JSON.stringify({ type: 'module' }));
 
-      const result = runCli(['list', '--evals-dir', evalsDir]);
+      const result = runCli(['list'], projectDir);
       expect(result.stdout).toContain('Invalid');
       expect(result.stdout).toContain('incomplete');
     });

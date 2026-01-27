@@ -58,10 +58,7 @@ program
 program
   .command('run')
   .argument('<config>', 'Path to experiment configuration file')
-  .option('--evals-dir <dir>', 'Directory containing eval fixtures', 'evals')
-  .option('--results-dir <dir>', 'Directory to store results', 'results')
-  .option('--dry', 'Dry run without actually executing agent')
-  .option('--verbose', 'Enable verbose output')
+  .option('--dry', 'Preview what would run without executing')
   .description('Run an experiment')
   .action(async (configPath: string, options) => {
     try {
@@ -75,13 +72,8 @@ program
       console.log(chalk.blue(`Loading config from ${configPath}...`));
       const config = await loadConfig(absoluteConfigPath);
 
-      if (options.verbose) {
-        console.log(chalk.gray('Resolved configuration:'));
-        console.log(chalk.gray(JSON.stringify(config, null, 2)));
-      }
-
-      // Discover evals (resolve relative to cwd, not config file)
-      const evalsDir = resolve(process.cwd(), options.evalsDir);
+      // Discover evals
+      const evalsDir = resolve(process.cwd(), 'evals');
       if (!existsSync(evalsDir)) {
         console.error(chalk.red(`Evals directory not found: ${evalsDir}`));
         process.exit(1);
@@ -136,7 +128,7 @@ program
 
       // Get experiment name from config file
       const experimentName = basename(configPath, '.ts').replace(/\.js$/, '');
-      const resultsDir = resolve(process.cwd(), options.resultsDir);
+      const resultsDir = resolve(process.cwd(), 'results');
 
       console.log(chalk.blue('\nStarting experiment...'));
 
@@ -148,7 +140,6 @@ program
         resultsDir,
         experimentName,
         onProgress: (msg) => console.log(msg),
-        verbose: options.verbose,
       });
 
       // Exit with appropriate code
@@ -169,11 +160,10 @@ program
  */
 program
   .command('list')
-  .option('--evals-dir <dir>', 'Directory containing eval fixtures', 'evals')
   .description('List available eval fixtures')
-  .action(async (options) => {
+  .action(async () => {
     try {
-      const evalsDir = resolve(process.cwd(), options.evalsDir);
+      const evalsDir = resolve(process.cwd(), 'evals');
 
       if (!existsSync(evalsDir)) {
         console.error(chalk.red(`Evals directory not found: ${evalsDir}`));
