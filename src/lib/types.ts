@@ -132,6 +132,8 @@ export interface EvalRunData {
   result: EvalRunResult;
   /** Structured transcript from Claude Code (saved to transcript.jsonl) */
   transcript?: string;
+  /** Files generated/modified by the agent (saved to outputs/) */
+  outputs?: Record<string, string>;
 }
 
 /**

@@ -3,7 +3,7 @@
  */
 
 import { mkdirSync, writeFileSync } from 'fs';
-import { join } from 'path';
+import { join, dirname } from 'path';
 import chalk from 'chalk';
 import type {
   EvalRunResult,
@@ -28,6 +28,7 @@ export function agentResultToEvalRunData(agentResult: AgentRunResult): EvalRunDa
       duration: agentResult.duration / 1000, // Convert to seconds
     },
     transcript: agentResult.transcript,
+    outputs: agentResult.generatedFiles,
   };
 }
 
@@ -162,8 +163,19 @@ export function saveResults(
         writeFileSync(join(runDir, 'transcript.jsonl'), runData.transcript);
       }
 
-      // Create outputs/ directory
-      mkdirSync(join(runDir, 'outputs'), { recursive: true });
+      // Save generated files to outputs/
+      const outputsDir = join(runDir, 'outputs');
+      mkdirSync(outputsDir, { recursive: true });
+      if (runData.outputs) {
+        for (const [filePath, content] of Object.entries(runData.outputs)) {
+          // Normalize path (remove leading ./ if present)
+          const normalizedPath = filePath.replace(/^\.\//, '');
+          const fullPath = join(outputsDir, normalizedPath);
+          // Create parent directories
+          mkdirSync(dirname(fullPath), { recursive: true });
+          writeFileSync(fullPath, content);
+        }
+      }
     }
   }
 

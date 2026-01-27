@@ -184,7 +184,11 @@ describe('results utilities', () => {
 
       const evals = [
         createEvalSummary('eval-1', [
-          { result: { status: 'passed', duration: 10 }, transcript: '{"role":"assistant"}' },
+          {
+            result: { status: 'passed', duration: 10 },
+            transcript: '{"role":"assistant"}',
+            outputs: { './src/App.tsx': 'export const App = () => <div>Hello</div>;' },
+          },
           { result: { status: 'failed', duration: 8, error: 'Error' } },
         ]),
       ];
@@ -216,9 +220,17 @@ describe('results utilities', () => {
       // No transcript for run-2
       expect(existsSync(join(outputDir, 'eval-1', 'run-2', 'transcript.jsonl'))).toBe(false);
 
-      // Check outputs/ directory exists
+      // Check outputs/ directory exists and contains files
       expect(existsSync(join(outputDir, 'eval-1', 'run-1', 'outputs'))).toBe(true);
       expect(existsSync(join(outputDir, 'eval-1', 'run-2', 'outputs'))).toBe(true);
+
+      // Verify generated files are saved to outputs/
+      expect(existsSync(join(outputDir, 'eval-1', 'run-1', 'outputs', 'src', 'App.tsx'))).toBe(true);
+      const outputContent = readFileSync(
+        join(outputDir, 'eval-1', 'run-1', 'outputs', 'src', 'App.tsx'),
+        'utf-8'
+      );
+      expect(outputContent).toBe('export const App = () => <div>Hello</div>;');
 
       // Verify experiment.json content
       const experimentJson = JSON.parse(
