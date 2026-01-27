@@ -46,61 +46,11 @@ describe('CLI', () => {
       expect(result.stdout).toContain('eval');
       expect(result.stdout).toContain('init');
       expect(result.stdout).toContain('run');
-      expect(result.stdout).toContain('list');
     });
 
     it('shows version with --version flag', () => {
       const result = runCli(['--version']);
-      expect(result.stdout).toContain('0.1.10');
-    });
-  });
-
-  describe('list command', () => {
-    it('shows error when evals directory does not exist', () => {
-      // Run from a directory without evals/
-      const emptyDir = join(TEST_DIR, 'empty');
-      mkdirSync(emptyDir);
-      const result = runCli(['list'], emptyDir);
-      expect(result.stderr).toContain('not found');
-      expect(result.exitCode).toBe(1);
-    });
-
-    it('lists valid fixtures', () => {
-      // Create project with evals directory
-      const projectDir = join(TEST_DIR, 'project');
-      mkdirSync(projectDir);
-      const evalsDir = join(projectDir, 'evals');
-      mkdirSync(evalsDir);
-
-      // Create a valid fixture
-      const fixture1 = join(evalsDir, 'add-button');
-      mkdirSync(fixture1);
-      writeFileSync(join(fixture1, 'PROMPT.md'), 'Add a button to the page');
-      writeFileSync(join(fixture1, 'EVAL.ts'), 'test code');
-      writeFileSync(join(fixture1, 'package.json'), JSON.stringify({ type: 'module' }));
-
-      const result = runCli(['list'], projectDir);
-      expect(result.stdout).toContain('add-button');
-      expect(result.stdout).toContain('Add a button');
-      expect(result.exitCode).toBe(0);
-    });
-
-    it('shows invalid fixtures as warnings', () => {
-      // Create project with evals directory
-      const projectDir = join(TEST_DIR, 'project2');
-      mkdirSync(projectDir);
-      const evalsDir = join(projectDir, 'evals');
-      mkdirSync(evalsDir);
-
-      // Create an invalid fixture (missing EVAL.ts)
-      const fixture = join(evalsDir, 'incomplete');
-      mkdirSync(fixture);
-      writeFileSync(join(fixture, 'PROMPT.md'), 'Task');
-      writeFileSync(join(fixture, 'package.json'), JSON.stringify({ type: 'module' }));
-
-      const result = runCli(['list'], projectDir);
-      expect(result.stdout).toContain('Invalid');
-      expect(result.stdout).toContain('incomplete');
+      expect(result.stdout).toContain('1.0.0');
     });
   });
 
@@ -112,13 +62,15 @@ describe('CLI', () => {
     });
 
     it('runs with valid config and evals (dry run)', () => {
-      // Create project structure
+      // Create project structure matching convention:
+      // project/experiments/config.ts and project/evals/
       const projectDir = join(TEST_DIR, 'project');
-      mkdirSync(projectDir);
+      const experimentsDir = join(projectDir, 'experiments');
+      mkdirSync(experimentsDir, { recursive: true });
 
-      // Create config file
+      // Create config file in experiments/
       const configContent = `export default { agent: 'claude-code' };`;
-      writeFileSync(join(projectDir, 'experiment.ts'), configContent);
+      writeFileSync(join(experimentsDir, 'default.ts'), configContent);
 
       // Create evals directory with valid fixture
       const evalsDir = join(projectDir, 'evals');
@@ -129,39 +81,44 @@ describe('CLI', () => {
       writeFileSync(join(fixture, 'EVAL.ts'), 'test code');
       writeFileSync(join(fixture, 'package.json'), JSON.stringify({ type: 'module' }));
 
-      const result = runCli(['run', 'experiment.ts', '--dry'], projectDir);
+      const result = runCli(['run', 'experiments/default.ts', '--dry'], projectDir);
       expect(result.stdout).toContain('my-eval');
       expect(result.stdout).toContain('DRY RUN');
       expect(result.exitCode).toBe(0);
     });
 
     it('shows error when no valid fixtures found', () => {
+      // Create project structure matching convention
       const projectDir = join(TEST_DIR, 'empty-project');
-      mkdirSync(projectDir);
+      const experimentsDir = join(projectDir, 'experiments');
+      mkdirSync(experimentsDir, { recursive: true });
 
       const configContent = `export default { agent: 'claude-code' };`;
-      writeFileSync(join(projectDir, 'experiment.ts'), configContent);
+      writeFileSync(join(experimentsDir, 'default.ts'), configContent);
 
+      // Create empty evals directory
       const evalsDir = join(projectDir, 'evals');
       mkdirSync(evalsDir);
 
-      const result = runCli(['run', 'experiment.ts'], projectDir);
+      const result = runCli(['run', 'experiments/default.ts'], projectDir);
       expect(result.stderr).toContain('No valid eval fixtures');
       expect(result.exitCode).toBe(1);
     });
 
     it('validates config file', () => {
+      // Create project structure matching convention
       const projectDir = join(TEST_DIR, 'bad-config');
-      mkdirSync(projectDir);
+      const experimentsDir = join(projectDir, 'experiments');
+      mkdirSync(experimentsDir, { recursive: true });
 
       // Create invalid config (missing agent)
       const configContent = `export default { model: 'opus' };`;
-      writeFileSync(join(projectDir, 'experiment.ts'), configContent);
+      writeFileSync(join(experimentsDir, 'default.ts'), configContent);
 
       const evalsDir = join(projectDir, 'evals');
       mkdirSync(evalsDir);
 
-      const result = runCli(['run', 'experiment.ts'], projectDir);
+      const result = runCli(['run', 'experiments/default.ts'], projectDir);
       expect(result.stderr).toContain('Error');
       expect(result.exitCode).toBe(1);
     });

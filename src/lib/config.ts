@@ -7,7 +7,10 @@ import type {
   ExperimentConfig,
   ResolvedExperimentConfig,
   EvalFilter,
+  AgentType,
+  ModelTier,
 } from './types.js';
+import { getAgent } from './agents/index.js';
 
 /**
  * Default configuration values.
@@ -25,8 +28,8 @@ export const CONFIG_DEFAULTS = {
  * Zod schema for validating experiment configuration.
  */
 const experimentConfigSchema = z.object({
-  agent: z.literal('claude-code'),
-  model: z.enum(['opus', 'sonnet', 'haiku']).optional(),
+  agent: z.enum(['claude-code', 'codex']),
+  model: z.string().optional(),
   evals: z
     .union([z.string(), z.array(z.string()), z.function().args(z.string()).returns(z.boolean())])
     .optional(),
@@ -55,12 +58,23 @@ export function validateConfig(config: unknown): ExperimentConfig {
 }
 
 /**
+ * Get the default model for an agent type.
+ */
+export function getDefaultModelForAgent(agentType: AgentType): ModelTier {
+  const agent = getAgent(agentType);
+  return agent.getDefaultModel();
+}
+
+/**
  * Resolves an experiment configuration by applying defaults.
  */
 export function resolveConfig(config: ExperimentConfig): ResolvedExperimentConfig {
+  // Get the default model based on the agent type
+  const defaultModel = config.model ?? getDefaultModelForAgent(config.agent);
+
   return {
     agent: config.agent,
-    model: config.model ?? CONFIG_DEFAULTS.model,
+    model: defaultModel,
     evals: config.evals ?? '*',
     runs: config.runs ?? CONFIG_DEFAULTS.runs,
     earlyExit: config.earlyExit ?? CONFIG_DEFAULTS.earlyExit,

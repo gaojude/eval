@@ -58,7 +58,12 @@ export {
 
 // Re-export agent utilities
 export type { AgentRunOptions, AgentRunResult } from './lib/agent.js';
-export { runAgent, getModelId } from './lib/agent.js';
+export { runAgent } from './lib/agent.js';
+
+// Re-export agent registry for advanced usage
+export type { Agent, ScriptResult } from './lib/agents/types.js';
+export { getAgent, listAgents, registerAgent } from './lib/agents/index.js';
+export { claudeCodeAgent, codexAgent } from './lib/agents/index.js';
 
 // Re-export results utilities
 export type { SaveResultsOptions } from './lib/results.js';

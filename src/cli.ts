@@ -13,6 +13,7 @@ import { loadConfig, resolveEvalNames } from './lib/config.js';
 import { loadAllFixtures } from './lib/fixture.js';
 import { runExperiment } from './lib/runner.js';
 import { initProject, getPostInitInstructions } from './lib/init.js';
+import { getAgent } from './lib/agents/index.js';
 
 // Load environment variables
 dotenvConfig();
@@ -22,7 +23,7 @@ const program = new Command();
 program
   .name('agent-eval')
   .description('Framework for testing AI coding agents in isolated sandboxes')
-  .version('0.1.10');
+  .version('1.0.0');
 
 /**
  * init command - Create a new eval project
@@ -60,7 +61,7 @@ program
   .argument('<config>', 'Path to experiment configuration file')
   .option('--dry', 'Preview what would run without executing')
   .description('Run an experiment')
-  .action(async (configPath: string, options) => {
+  .action(async (configPath: string, options: { dry?: boolean }) => {
     try {
       const absoluteConfigPath = resolve(process.cwd(), configPath);
 
@@ -72,10 +73,13 @@ program
       console.log(chalk.blue(`Loading config from ${configPath}...`));
       const config = await loadConfig(absoluteConfigPath);
 
-      // Discover evals
-      const evalsDir = resolve(process.cwd(), 'evals');
+      // Discover evals - infer from config file location
+      // Config at project/experiments/foo.ts -> evals at project/evals/
+      const projectDir = dirname(dirname(absoluteConfigPath));
+      const evalsDir = resolve(projectDir, 'evals');
       if (!existsSync(evalsDir)) {
         console.error(chalk.red(`Evals directory not found: ${evalsDir}`));
+        console.error(chalk.gray(`Expected evals/ to be sibling to experiments/ directory`));
         process.exit(1);
       }
 
@@ -109,17 +113,20 @@ program
       }
 
       console.log(chalk.blue(`\nRunning ${evalNames.length} eval(s) x ${config.runs} run(s) = ${evalNames.length * config.runs} total runs`));
-      console.log(chalk.blue(`Model: ${config.model}, Timeout: ${config.timeout}s, Early Exit: ${config.earlyExit}`));
+      console.log(chalk.blue(`Agent: ${config.agent}, Model: ${config.model}, Timeout: ${config.timeout}s, Early Exit: ${config.earlyExit}`));
 
       if (options.dry) {
         console.log(chalk.yellow('\n[DRY RUN] Would execute evals here'));
         return;
       }
 
-      // Check for required API key
-      const apiKey = process.env.ANTHROPIC_API_KEY;
+      // Get the agent to check for required API key
+      const agent = getAgent(config.agent);
+      const apiKeyEnvVar = agent.getApiKeyEnvVar();
+      const apiKey = process.env[apiKeyEnvVar];
       if (!apiKey) {
-        console.error(chalk.red('ANTHROPIC_API_KEY environment variable is required'));
+        console.error(chalk.red(`${apiKeyEnvVar} environment variable is required`));
+        console.error(chalk.gray(`Get your API key at: https://vercel.com/dashboard -> AI Gateway`));
         process.exit(1);
       }
 
@@ -150,50 +157,6 @@ program
         console.error(chalk.red(`Error: ${error.message}`));
       } else {
         console.error(chalk.red('An unknown error occurred'));
-      }
-      process.exit(1);
-    }
-  });
-
-/**
- * list command - List available evals
- */
-program
-  .command('list')
-  .description('List available eval fixtures')
-  .action(async () => {
-    try {
-      const evalsDir = resolve(process.cwd(), 'evals');
-
-      if (!existsSync(evalsDir)) {
-        console.error(chalk.red(`Evals directory not found: ${evalsDir}`));
-        process.exit(1);
-      }
-
-      const { fixtures, errors } = loadAllFixtures(evalsDir);
-
-      if (fixtures.length > 0) {
-        console.log(chalk.green(`\nValid eval fixtures (${fixtures.length}):`));
-        for (const fixture of fixtures) {
-          const promptPreview = fixture.prompt.slice(0, 60).replace(/\n/g, ' ');
-          console.log(chalk.green(`  ${fixture.name}`));
-          console.log(chalk.gray(`    ${promptPreview}${fixture.prompt.length > 60 ? '...' : ''}`));
-        }
-      }
-
-      if (errors.length > 0) {
-        console.log(chalk.yellow(`\nInvalid fixtures (${errors.length}):`));
-        for (const error of errors) {
-          console.log(chalk.yellow(`  ${error.fixtureName}: ${error.message}`));
-        }
-      }
-
-      if (fixtures.length === 0 && errors.length === 0) {
-        console.log(chalk.gray('No eval fixtures found'));
-      }
-    } catch (error) {
-      if (error instanceof Error) {
-        console.error(chalk.red(`Error: ${error.message}`));
       }
       process.exit(1);
     }

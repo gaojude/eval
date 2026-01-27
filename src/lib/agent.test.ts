@@ -1,11 +1,11 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdirSync, writeFileSync, rmSync, existsSync } from 'fs';
 import { join } from 'path';
-import { getModelId } from './agent.js';
 
 const TEST_DIR = '/tmp/eval-framework-agent-test';
 
-describe('agent utilities', () => {
+// Mock-based tests for runAgent
+describe('runAgent logic', () => {
   beforeEach(() => {
     mkdirSync(TEST_DIR, { recursive: true });
   });
@@ -16,28 +16,10 @@ describe('agent utilities', () => {
     }
   });
 
-  describe('getModelId', () => {
-    it('returns correct model ID for opus', () => {
-      expect(getModelId('opus')).toBe('claude-opus-4-5-20251101');
-    });
-
-    it('returns correct model ID for sonnet', () => {
-      expect(getModelId('sonnet')).toBe('claude-sonnet-4-20250514');
-    });
-
-    it('returns correct model ID for haiku', () => {
-      expect(getModelId('haiku')).toBe('claude-haiku-3-5-20241022');
-    });
-  });
-});
-
-// Mock-based tests for runAgent
-describe('runAgent logic', () => {
   it('creates fixture for testing', () => {
     // Create a minimal fixture structure for testing
     const fixturePath = join(TEST_DIR, 'test-fixture');
-    mkdirSync(fixturePath, { recursive: true });
-    mkdirSync(join(fixturePath, 'src'));
+    mkdirSync(join(fixturePath, 'src'), { recursive: true });
 
     writeFileSync(join(fixturePath, 'package.json'), JSON.stringify({
       name: 'test',
@@ -62,8 +44,7 @@ describe.skipIf(!process.env.AGENT_INTEGRATION_TEST)('agent integration', () => 
 
     // Create test fixture
     const fixturePath = join(TEST_DIR, 'simple-fixture');
-    mkdirSync(fixturePath, { recursive: true });
-    mkdirSync(join(fixturePath, 'src'));
+    mkdirSync(join(fixturePath, 'src'), { recursive: true });
 
     writeFileSync(
       join(fixturePath, 'package.json'),

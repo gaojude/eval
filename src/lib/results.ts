@@ -21,49 +21,28 @@ export function agentResultToEvalRunData(agentResult: AgentRunResult): EvalRunDa
   // Collect output content from scripts and tests
   const outputContent: EvalRunData['outputContent'] = {};
 
-  if (agentResult.testOutput) {
-    outputContent.tests = agentResult.testOutput;
+  if (agentResult.testResult?.output) {
+    outputContent.tests = agentResult.testResult.output;
   }
-  if (agentResult.buildOutput) {
-    outputContent.build = agentResult.buildOutput;
-  }
-  if (agentResult.lintOutput) {
-    outputContent.lint = agentResult.lintOutput;
+
+  // Add all script outputs
+  if (agentResult.scriptsResults) {
+    for (const [name, result] of Object.entries(agentResult.scriptsResults)) {
+      if (result.output) {
+        outputContent[name] = result.output;
+      }
+    }
   }
 
   return {
     result: {
       status: agentResult.success ? 'passed' : 'failed',
-      failedStep: agentResult.error
-        ? determineFailedStep(agentResult)
-        : undefined,
       error: agentResult.error,
       duration: agentResult.duration / 1000, // Convert to seconds
     },
     transcript: agentResult.transcript,
     outputContent: Object.keys(outputContent).length > 0 ? outputContent : undefined,
   };
-}
-
-/**
- * Determine which step failed based on the result.
- */
-function determineFailedStep(
-  result: AgentRunResult
-): 'setup' | 'agent' | 'scripts' | 'tests' {
-  if (result.error?.includes('install failed') || result.error?.includes('setup')) {
-    return 'setup';
-  }
-  if (result.error?.includes('Claude Code')) {
-    return 'agent';
-  }
-  if (result.buildSuccess === false || result.lintSuccess === false) {
-    return 'scripts';
-  }
-  if (result.testSuccess === false) {
-    return 'tests';
-  }
-  return 'agent';
 }
 
 /**

@@ -5,12 +5,13 @@
 /**
  * Supported AI agent types.
  */
-export type AgentType = 'claude-code';
+export type AgentType = 'claude-code' | 'codex';
 
 /**
- * Supported Claude model tiers.
+ * Model identifier - any string accepted.
+ * Each agent validates its own models at runtime.
  */
-export type ModelTier = 'opus' | 'sonnet' | 'haiku';
+export type ModelTier = string;
 
 /**
  * Function type for filtering evals.
@@ -47,7 +48,7 @@ export type SetupFunction = (sandbox: Sandbox) => Promise<void>;
  * Defines what to test and how.
  */
 export interface ExperimentConfig {
-  /** Which AI agent to use (currently only 'claude-code' supported) */
+  /** Which AI agent to use */
   agent: AgentType;
 
   /** Which AI model the agent should use. @default 'opus' */
@@ -116,8 +117,6 @@ export interface EvalFixture {
 export interface EvalRunResult {
   /** Pass or fail status */
   status: 'passed' | 'failed';
-  /** Which step failed (if status is 'failed') */
-  failedStep?: 'setup' | 'agent' | 'scripts' | 'tests';
   /** Error message if failed */
   error?: string;
   /** Duration in seconds */

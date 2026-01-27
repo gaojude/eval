@@ -43,9 +43,11 @@ describe('validateConfig', () => {
     expect(() => validateConfig(config)).toThrow('Invalid experiment configuration');
   });
 
-  it('rejects invalid model', () => {
-    const config = { agent: 'claude-code', model: 'gpt-4' };
-    expect(() => validateConfig(config)).toThrow('Invalid experiment configuration');
+  it('accepts any model string', () => {
+    // Model can be any string - allows custom/future models
+    const config = { agent: 'claude-code', model: 'custom-model-v1' };
+    const validated = validateConfig(config);
+    expect(validated.model).toBe('custom-model-v1');
   });
 
   it('rejects non-positive runs', () => {
@@ -75,7 +77,8 @@ describe('resolveConfig', () => {
     const resolved = resolveConfig(config);
 
     expect(resolved.agent).toBe('claude-code');
-    expect(resolved.model).toBe(CONFIG_DEFAULTS.model);
+    // Default model comes from the agent, not CONFIG_DEFAULTS
+    expect(resolved.model).toBe('sonnet');
     expect(resolved.runs).toBe(CONFIG_DEFAULTS.runs);
     expect(resolved.earlyExit).toBe(CONFIG_DEFAULTS.earlyExit);
     expect(resolved.scripts).toEqual(CONFIG_DEFAULTS.scripts);

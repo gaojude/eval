@@ -32,9 +32,11 @@ describe('results utilities', () => {
         output: 'Agent output',
         transcript: '{"role":"assistant","content":"Hello"}',
         duration: 45000, // 45 seconds in ms
-        buildSuccess: true,
-        lintSuccess: true,
-        testSuccess: true,
+        testResult: { success: true, output: 'test output' },
+        scriptsResults: {
+          build: { success: true, output: 'build output' },
+          lint: { success: true, output: 'lint output' },
+        },
         sandboxId: 'sandbox-123',
       };
 
@@ -43,7 +45,6 @@ describe('results utilities', () => {
       expect(runData.result.status).toBe('passed');
       expect(runData.result.duration).toBe(45); // Converted to seconds
       expect(runData.result.error).toBeUndefined();
-      expect(runData.result.failedStep).toBeUndefined();
       expect(runData.transcript).toBe('{"role":"assistant","content":"Hello"}');
     });
 
@@ -52,45 +53,32 @@ describe('results utilities', () => {
         success: false,
         output: 'Agent output',
         duration: 30000,
-        error: 'Claude Code exited with code 1',
-        buildSuccess: true,
-        testSuccess: false,
+        error: 'API Error: model not found',
+        scriptsResults: { build: { success: true, output: '' } },
+        testResult: { success: false, output: 'test failed' },
       };
 
       const runData = agentResultToEvalRunData(agentResult);
 
       expect(runData.result.status).toBe('failed');
-      expect(runData.result.error).toBe('Claude Code exited with code 1');
-      expect(runData.result.failedStep).toBe('agent');
+      expect(runData.result.error).toBe('API Error: model not found');
     });
 
-    it('identifies setup failure', () => {
+    it('includes output content from scripts and tests', () => {
       const agentResult: AgentRunResult = {
-        success: false,
-        output: '',
-        duration: 5000,
-        error: 'npm install failed: ENOENT',
-      };
-
-      const runData = agentResultToEvalRunData(agentResult);
-
-      expect(runData.result.failedStep).toBe('setup');
-    });
-
-    it('identifies test failure', () => {
-      const agentResult: AgentRunResult = {
-        success: false,
+        success: true,
         output: 'Agent output',
-        duration: 60000,
-        error: 'Tests failed',
-        buildSuccess: true,
-        lintSuccess: true,
-        testSuccess: false,
+        duration: 30000,
+        testResult: { success: true, output: 'test output here' },
+        scriptsResults: {
+          build: { success: true, output: 'build output here' },
+        },
       };
 
       const runData = agentResultToEvalRunData(agentResult);
 
-      expect(runData.result.failedStep).toBe('tests');
+      expect(runData.outputContent?.tests).toBe('test output here');
+      expect(runData.outputContent?.build).toBe('build output here');
     });
 
     it('handles missing transcript', () => {

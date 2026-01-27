@@ -1,271 +1,242 @@
 # @judegao/eval
 
-Test AI coding agents with real-world tasks in isolated sandboxes.
+Test AI coding agents on your framework. Measure what actually works.
 
 ## Why?
 
-You just spent 3 hours testing your agent manually. It works great! But then you:
-- Update a system prompt → agent breaks on 20% of tasks
-- Switch from Opus to Haiku → silent regression in complex tasks
-- Add a new tool → existing tasks fail in unexpected ways
+You're building a frontend framework and want AI agents to work well with it. But how do you know if:
+- Your documentation helps agents write correct code?
+- Adding an MCP server improves agent success rates?
+- Sonnet performs as well as Opus for your use cases?
+- Your latest API changes broke agent compatibility?
 
-**This framework prevents that.** Run your agent against real tasks, measure pass rates, catch regressions automatically.
+**This framework gives you answers.** Run controlled experiments, measure pass rates, compare techniques.
 
 ## Quick Start
 
-**Requirements:** Node.js 18+
-
 ```bash
 # Create a new eval project
-npx @judegao/eval init my-evals
-cd my-evals
+npx @judegao/eval init my-framework-evals
+cd my-framework-evals
 
 # Install dependencies
 npm install
 
-# Add your API keys (see Environment Variables below)
+# Add your API keys
 cp .env.example .env
 # Edit .env with your ANTHROPIC_API_KEY and VERCEL_TOKEN
 
-# Run evals
+# Preview what will run (no API calls, no cost)
+npm run eval -- --dry
+
+# Run the evals
 npm run eval
 ```
 
-**Expected output:**
-```
-Running add-greeting [1/1]...
-✓ add-greeting [1/1] (42.3s)
+## A/B Testing AI Techniques
 
-Experiment Results
-────────────────────────────────────────────────────────────
-✓ add-greeting: 1/1 passed (100%)
-  Mean duration: 42.3s
+The real power is comparing different approaches. Create multiple experiment configs:
 
-Overall: 1/1 passed (100%)
-```
-
-## How It Works
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                     Your Eval Project                       │
-├─────────────────────────────────────────────────────────────┤
-│  experiments/                                               │
-│    default.ts          ← Experiment config (model, runs)    │
-│                                                             │
-│  evals/                                                     │
-│    add-feature/                                             │
-│      PROMPT.md         ← Task description for the agent     │
-│      EVAL.ts           ← Test file (vitest) to verify work  │
-│      package.json      ← Dependencies for this eval         │
-│      src/              ← Starting code (agent modifies this)│
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│                    Vercel Sandbox (isolated VM)             │
-├─────────────────────────────────────────────────────────────┤
-│  1. Upload starting code (agent can't see EVAL.ts)          │
-│  2. Run setup function (if configured)                      │
-│  3. Install dependencies (npm install)                      │
-│  4. Run Claude Code agent with PROMPT.md                    │
-│  5. Agent modifies files to complete the task               │
-│  6. Upload EVAL.ts (now), run tests + scripts               │
-│  7. Report pass/fail                                        │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│                         Results                             │
-├─────────────────────────────────────────────────────────────┤
-│  add-feature: 8/10 passed (80%)                             │
-│  fix-bug: 10/10 passed (100%)                               │
-│  refactor: 6/10 passed (60%)                                │
-│                                                             │
-│  Overall: 24/30 passed (80%)                                │
-└─────────────────────────────────────────────────────────────┘
-```
-
-## Creating Evals
-
-Each eval is a folder with:
-
-### PROMPT.md
-The task description given to the agent:
-
-```markdown
-Add a logout button to the navbar.
-
-Requirements:
-- Add a "Logout" button in the top-right corner
-- Clicking it should call the `logout()` function from auth.ts
-- Button should only appear when user is logged in
-```
-
-### EVAL.ts
-A vitest test file that verifies the agent's work:
+### Control: Baseline Agent
 
 ```typescript
-import { test, expect } from 'vitest';
-import { readFileSync } from 'fs';
-import { execSync } from 'child_process';
-
-test('logout button exists', () => {
-  const navbar = readFileSync('src/components/Navbar.tsx', 'utf-8');
-  expect(navbar).toContain('Logout');
-  expect(navbar).toContain('logout()');
-});
-
-test('app still builds', () => {
-  execSync('npm run build', { stdio: 'pipe' });
-});
-```
-
-### package.json
-Dependencies needed for the eval. **Must have `"type": "module"`** (required):
-
-```json
-{
-  "name": "add-logout-button",
-  "type": "module",
-  "scripts": { "build": "tsc" },
-  "dependencies": { "react": "^18.0.0" }
-}
-```
-
-### src/
-The starting codebase that the agent will modify.
-
-## Experiment Configuration
-
-Create `experiments/default.ts`:
-
-```typescript
+// experiments/control.ts
 import type { ExperimentConfig } from '@judegao/eval';
 
 const config: ExperimentConfig = {
   agent: 'claude-code',
   model: 'sonnet',
-  runs: 5,
-  earlyExit: false,
-  scripts: ['build'],
-  timeout: 300,
+  runs: 10,        // Multiple runs for statistical significance
+  earlyExit: false, // Run all attempts to measure reliability
 };
 
 export default config;
 ```
 
-### Configuration Defaults
-
-| Option      | Default        | Description                                      |
-|-------------|----------------|--------------------------------------------------|
-| `agent`     | —              | **Required.** Only `'claude-code'` supported     |
-| `model`     | `'opus'`       | Claude model: `'opus'`, `'sonnet'`, or `'haiku'` |
-| `evals`     | `'*'`          | Run all evals, or filter with array/function     |
-| `runs`      | `1`            | Number of times to run each eval                 |
-| `earlyExit` | `true`         | Stop after first successful run                  |
-| `scripts`   | `[]`           | npm scripts to run after agent (tests always run)|
-| `timeout`   | `300`          | Seconds per run (5 minutes)                      |
-| `setup`     | —              | Optional setup function (see below)              |
-
-### Model Selection
-
-| Model  | Best For                        | Cost (input/output per MTok) |
-|--------|---------------------------------|------------------------------|
-| `opus` | Complex tasks, highest quality  | $15 / $75                    |
-| `sonnet`| Balanced performance and cost  | $3 / $15                     |
-| `haiku`| Fast iteration, simple tasks    | $0.25 / $1.25                |
-
-### Filtering Evals
+### Treatment: Agent with MCP Server
 
 ```typescript
-// Run all evals
-evals: '*',
-
-// Run specific evals
-evals: ['add-feature', 'fix-bug'],
-
-// Run evals matching a pattern
-evals: (name) => name.startsWith('api-'),
-```
-
-### Setup Function
-
-Run custom initialization before the agent starts:
-
-```typescript
+// experiments/with-mcp.ts
 import type { ExperimentConfig } from '@judegao/eval';
 
 const config: ExperimentConfig = {
   agent: 'claude-code',
+  model: 'sonnet',
+  runs: 10,
+  earlyExit: false,
 
   setup: async (sandbox) => {
-    // Write environment files
+    // Install your framework's MCP server
+    await sandbox.runCommand('npm', ['install', '-g', '@myframework/mcp-server']);
+
+    // Configure Claude to use it
     await sandbox.writeFiles({
-      '.env': 'DATABASE_URL=postgres://localhost/test'
+      '.claude/settings.json': JSON.stringify({
+        mcpServers: {
+          myframework: { command: 'myframework-mcp' }
+        }
+      })
     });
-
-    // Run setup commands
-    await sandbox.runCommand('npm', ['run', 'seed']);
-
-    // Read files if needed
-    const pkg = await sandbox.readFile('package.json');
   },
 };
 
 export default config;
 ```
 
-The `sandbox` object provides:
-- `writeFiles(files)` - Write multiple files
-- `runCommand(cmd, args)` - Run a command
-- `readFile(path)` - Read a file
-- `getWorkingDirectory()` - Get working directory path
+### Run Both & Compare
 
-## CLI Reference
+```bash
+# Preview first
+npx agent-eval run experiments/control.ts --dry
+npx agent-eval run experiments/with-mcp.ts --dry
+
+# Run experiments
+npx agent-eval run experiments/control.ts
+npx agent-eval run experiments/with-mcp.ts
+```
+
+**Compare results:**
+```
+Control (baseline):     7/10 passed (70%)
+With MCP:              9/10 passed (90%)
+```
+
+## Creating Evals for Your Framework
+
+Each eval tests one specific task an agent should be able to do with your framework.
+
+### Example: Testing Component Creation
+
+```
+evals/
+  create-button-component/
+    PROMPT.md           # Task for the agent
+    EVAL.ts             # Tests to verify success
+    package.json        # Your framework as a dependency
+    src/                # Starter code
+```
+
+**PROMPT.md** - What you want the agent to do:
+```markdown
+Create a Button component using MyFramework.
+
+Requirements:
+- Export a Button component from src/components/Button.tsx
+- Accept `label` and `onClick` props
+- Use the framework's styling system for hover states
+```
+
+**EVAL.ts** - How you verify it worked:
+```typescript
+import { test, expect } from 'vitest';
+import { readFileSync, existsSync } from 'fs';
+import { execSync } from 'child_process';
+
+test('Button component exists', () => {
+  expect(existsSync('src/components/Button.tsx')).toBe(true);
+});
+
+test('has required props', () => {
+  const content = readFileSync('src/components/Button.tsx', 'utf-8');
+  expect(content).toContain('label');
+  expect(content).toContain('onClick');
+});
+
+test('project builds', () => {
+  execSync('npm run build', { stdio: 'pipe' });
+});
+```
+
+**package.json** - Include your framework:
+```json
+{
+  "name": "create-button-component",
+  "type": "module",
+  "scripts": { "build": "tsc" },
+  "dependencies": {
+    "myframework": "^2.0.0"
+  }
+}
+```
+
+## Experiment Ideas
+
+| Experiment | Control | Treatment |
+|------------|---------|-----------|
+| MCP impact | No MCP | With MCP server |
+| Model comparison | Haiku | Sonnet / Opus |
+| Documentation | Minimal docs | Rich examples |
+| System prompt | Default | Framework-specific |
+| Tool availability | Read/write only | + custom tools |
+
+## Configuration Reference
+
+```typescript
+import type { ExperimentConfig } from '@judegao/eval';
+
+const config: ExperimentConfig = {
+  // Required: which agent to use
+  agent: 'claude-code',  // or 'codex'
+
+  // Model to use (any valid model ID)
+  model: 'sonnet',
+
+  // How many times to run each eval
+  runs: 10,
+
+  // Stop after first success? (false for reliability measurement)
+  earlyExit: false,
+
+  // npm scripts that must pass after agent finishes
+  scripts: ['build', 'lint'],
+
+  // Timeout per run in seconds
+  timeout: 300,
+
+  // Filter which evals to run
+  evals: '*',                              // all
+  evals: ['specific-eval'],                // by name
+  evals: (name) => name.startsWith('api-'), // by function
+
+  // Setup function for environment configuration
+  setup: async (sandbox) => {
+    await sandbox.writeFiles({ '.env': 'API_KEY=test' });
+    await sandbox.runCommand('npm', ['run', 'setup']);
+  },
+};
+
+export default config;
+```
+
+## CLI Commands
 
 ### `agent-eval init <name>`
 
-Create a new eval project with example fixtures.
-
+Create a new eval project:
 ```bash
 npx @judegao/eval init my-evals
 ```
 
 ### `agent-eval run <config>`
 
-Run an experiment.
-
+Run an experiment:
 ```bash
-agent-eval run experiments/default.ts
+npx agent-eval run experiments/default.ts
 ```
 
-**Options:**
-- `--dry` - Preview what would run without executing (no API calls, no cost)
-
+**Dry run** - preview without executing (no API calls, no cost):
 ```bash
-agent-eval run experiments/default.ts --dry
+npx agent-eval run experiments/default.ts --dry
 
 # Output:
-# Found 3 valid fixture(s), will run 3:
-#   - add-feature
-#   - fix-bug
-#   - refactor
-# Running 3 eval(s) x 5 run(s) = 15 total runs
-# Model: sonnet, Timeout: 300s, Early Exit: false
+# Found 5 valid fixture(s), will run 5:
+#   - create-button
+#   - add-routing
+#   - setup-state
+#   - ...
+# Running 5 eval(s) x 10 run(s) = 50 total runs
+# Agent: claude-code, Model: sonnet, Timeout: 300s
 # [DRY RUN] Would execute evals here
-```
-
-**Exit codes:**
-- `0` - All evals passed (useful for CI/CD)
-- `1` - One or more evals failed
-
-### `agent-eval list`
-
-List all available eval fixtures.
-
-```bash
-agent-eval list
 ```
 
 ## Results
@@ -274,138 +245,63 @@ Results are saved to `results/<experiment>/<timestamp>/`:
 
 ```
 results/
-  default/
+  with-mcp/
     2024-01-27T10-30-00Z/
-      experiment.json      ← Full results with config
-      add-feature/
-        summary.json       ← Pass rate, mean duration
+      experiment.json       # Config and summary
+      create-button/
+        summary.json        # { totalRuns: 10, passedRuns: 9, passRate: "90%" }
         run-1/
-          result.json      ← Individual run details
-          transcript.jsonl ← Agent conversation log
-          outputs/         ← Script/test output files
-        run-2/
-          result.json
-          transcript.jsonl
-          outputs/
+          result.json       # Individual run result
+          transcript.jsonl  # Agent conversation
+          outputs/          # Test/script output
 ```
 
-### Result Files
+### Analyzing Results
 
-**result.json** - Execution metadata with paths to outputs:
-```json
-{
-  "status": "failed",
-  "failedStep": "tests",
-  "error": "Test failed: expected 'Logout' to be in navbar",
-  "duration": 45.2,
-  "transcriptPath": "./transcript.jsonl",
-  "outputPaths": {
-    "tests": "./outputs/tests.txt",
-    "build": "./outputs/build.txt"
-  }
-}
+```bash
+# Quick comparison
+cat results/control/*/experiment.json | jq '.evals[] | {name, passRate}'
+cat results/with-mcp/*/experiment.json | jq '.evals[] | {name, passRate}'
 ```
 
-**summary.json** - Aggregated stats:
-```json
-{
-  "totalRuns": 10,
-  "passedRuns": 7,
-  "passRate": "70%",
-  "meanDuration": 45.2
-}
-```
-
-**transcript.jsonl** - Agent conversation (one JSON object per line):
-```json
-{"role": "assistant", "content": "I'll add a logout button..."}
-{"role": "tool", "name": "write_file", "input": {"path": "src/Header.tsx"}}
-```
-
-### Interpreting Results
-
-| Pass Rate | Meaning                                          |
-|-----------|--------------------------------------------------|
-| 100%      | Excellent! Agent is reliable for this task.      |
-| 80-99%    | Good. Minor improvements possible.               |
-| 50-79%    | Needs work. Review prompt or task complexity.    |
-| < 50%     | Task too hard or prompt needs significant work.  |
-
-### Debugging Failed Runs
-
-1. Check `result.json` for the `failedStep`:
-   - `setup`: npm install or setup function failed
-   - `agent`: Claude Code exited with error
-   - `scripts`: npm scripts (build, lint) failed
-   - `tests`: EVAL.ts tests failed
-
-2. Check `transcript.jsonl` to see what the agent did
-
-3. Check `outputs/` for full script/test output (e.g., `tests.txt`, `build.txt`)
-
-## Cost Estimation
-
-Costs depend on model choice and task complexity:
-
-| Model  | Typical Task | 10-run Eval |
-|--------|--------------|-------------|
-| Haiku  | $0.10-0.50   | $1-5        |
-| Sonnet | $0.50-2.00   | $5-20       |
-| Opus   | $2.00-10.00  | $20-100     |
-
-**Tips to reduce costs:**
-- Use `--dry` to preview before running
-- Use `earlyExit: true` during development
-- Start with Haiku, upgrade only for complex tasks
-- Filter to specific evals: `evals: ['one-eval']`
+| Pass Rate | Interpretation |
+|-----------|----------------|
+| 90-100%   | Agent handles this reliably |
+| 70-89%    | Usually works, room for improvement |
+| 50-69%    | Unreliable, needs investigation |
+| < 50%     | Task too hard or prompt needs work |
 
 ## Environment Variables
 
-```bash
-# Required: Anthropic API key for Claude
-# Get yours at: https://console.anthropic.com/
-ANTHROPIC_API_KEY=sk-ant-...
+All agents use **Vercel AI Gateway** for unified billing and observability:
 
-# Required: Vercel access (pick one)
-# Create a token at: https://vercel.com/account/tokens
-VERCEL_TOKEN=...        # Personal access token
+```bash
+# Required: Vercel AI Gateway API key (works for all agents)
+# Get yours at: https://vercel.com/dashboard -> AI Gateway
+AI_GATEWAY_API_KEY=your-ai-gateway-api-key
+
+# Required: Vercel sandbox access
+# Create at: https://vercel.com/account/tokens
+VERCEL_TOKEN=...
 # OR
-VERCEL_OIDC_TOKEN=...   # OIDC token (for CI/CD pipelines)
+VERCEL_OIDC_TOKEN=...         # For CI/CD pipelines
 ```
 
-## Troubleshooting
+Benefits of AI Gateway:
+- **Single API key** for Claude Code, Codex, and 200+ other models
+- **Unified billing** - one invoice instead of multiple provider accounts
+- **Observability** - request traces and spend tracking in Vercel dashboard
+- **Automatic fallbacks** - resilience when providers have issues
 
-### "ANTHROPIC_API_KEY environment variable is required"
-Create a `.env` file in your project root with your API key.
+## Tips
 
-### "Evals directory not found"
-Run `agent-eval` from your project root (where `evals/` exists).
+**Start with `--dry`**: Always preview before running to verify your config and avoid unexpected costs.
 
-### "package.json must have type: module"
-Add `"type": "module"` to your eval's package.json.
+**Use multiple runs**: Single runs don't tell you reliability. Use `runs: 10` and `earlyExit: false` for meaningful data.
 
-### Tests pass locally but fail in sandbox
-The agent doesn't see `EVAL.ts` or `PROMPT.md` — only your source files. Make sure your tests only reference files the agent can modify.
+**Isolate variables**: Change one thing at a time between experiments. Don't compare "Opus with MCP" to "Haiku without MCP".
 
-### "npm install failed"
-Check that your eval's package.json has valid dependencies compatible with Node 20+.
-
-## Best Practices
-
-### Writing Good Prompts
-- **Be specific:** "Add a blue logout button in the top-right corner" not "add a button"
-- **List requirements:** Clear acceptance criteria
-- **Mention context:** Reference existing files/functions the agent should use
-
-### Writing Good Tests
-- **Test behavior:** Check that logout works, not that specific code exists
-- **Always test the build:** Include a compilation/build test
-- **Keep tests fast:** Seconds, not minutes
-
-### Organizing Evals
-- **One task per eval:** Don't combine multiple features
-- **Name clearly:** `add-auth-button` not `test-1`
-- **Progressive complexity:** Start simple, add harder evals as agent improves
+**Test incrementally**: Start with simple tasks, add complexity as you learn what works.
 
 ## License
 

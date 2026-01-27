@@ -9,7 +9,7 @@ import type {
   EvalSummary,
   ExperimentResults,
 } from './types.js';
-import { runAgent } from './agent.js';
+import { getAgent } from './agents/index.js';
 import {
   agentResultToEvalRunData,
   createEvalSummary,
@@ -28,7 +28,7 @@ export interface RunExperimentOptions {
   config: ResolvedExperimentConfig;
   /** Fixtures to run */
   fixtures: EvalFixture[];
-  /** Anthropic API key */
+  /** API key for the agent */
   apiKey: string;
   /** Directory to save results */
   resultsDir: string;
@@ -50,6 +50,9 @@ export async function runExperiment(
   const startedAt = new Date();
   const evalSummaries: EvalSummary[] = [];
 
+  // Get the agent from registry
+  const agent = getAgent(config.agent);
+
   const log = (msg: string) => {
     if (onProgress) {
       onProgress(msg);
@@ -64,7 +67,7 @@ export async function runExperiment(
     for (let i = 0; i < config.runs; i++) {
       log(createProgressDisplay(fixture.name, i + 1, config.runs));
 
-      const agentResult = await runAgent(fixture.path, {
+      const agentResult = await agent.run(fixture.path, {
         prompt: fixture.prompt,
         model: config.model,
         timeout: config.timeout * 1000, // Convert to milliseconds
@@ -110,6 +113,7 @@ export async function runExperiment(
 export async function runSingleEval(
   fixture: EvalFixture,
   options: {
+    agent?: ResolvedExperimentConfig['agent'];
     model: ResolvedExperimentConfig['model'];
     timeout: number;
     apiKey: string;
@@ -118,7 +122,10 @@ export async function runSingleEval(
     verbose?: boolean;
   }
 ): Promise<EvalRunData> {
-  const agentResult = await runAgent(fixture.path, {
+  // Default to claude-code for backwards compatibility
+  const agent = getAgent(options.agent ?? 'claude-code');
+
+  const agentResult = await agent.run(fixture.path, {
     prompt: fixture.prompt,
     model: options.model,
     timeout: options.timeout * 1000,

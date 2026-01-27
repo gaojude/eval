@@ -48,7 +48,7 @@ describe('init utilities', () => {
 
       const content = readFileSync(configPath, 'utf-8');
       expect(content).toContain("agent: 'claude-code'");
-      expect(content).toContain("model: 'haiku'");
+      expect(content).toContain("model: 'sonnet'");
     });
 
     it('creates example eval fixture', () => {
@@ -112,7 +112,7 @@ describe('init utilities', () => {
       const envPath = join(projectDir, '.env.example');
       const content = readFileSync(envPath, 'utf-8');
 
-      expect(content).toContain('ANTHROPIC_API_KEY');
+      expect(content).toContain('AI_GATEWAY_API_KEY');
       expect(content).toContain('VERCEL_TOKEN');
     });
 

@@ -19,8 +19,9 @@ import { loadConfig } from './lib/config.js';
 dotenvConfig();
 
 const TEST_DIR = '/tmp/eval-framework-integration-test';
+// All agents use AI Gateway API key
 const hasCredentials =
-  process.env.ANTHROPIC_API_KEY && (process.env.VERCEL_TOKEN || process.env.VERCEL_OIDC_TOKEN);
+  process.env.AI_GATEWAY_API_KEY && (process.env.VERCEL_TOKEN || process.env.VERCEL_OIDC_TOKEN);
 
 describe.skipIf(!process.env.INTEGRATION_TEST)('integration tests', () => {
   beforeAll(() => {
@@ -43,6 +44,7 @@ describe.skipIf(!process.env.INTEGRATION_TEST)('integration tests', () => {
       // Verify structure
       expect(existsSync(join(projectDir, 'package.json'))).toBe(true);
       expect(existsSync(join(projectDir, 'experiments/default.ts'))).toBe(true);
+      expect(existsSync(join(projectDir, 'experiments/codex.ts'))).toBe(true);
       expect(existsSync(join(projectDir, 'evals/add-greeting/PROMPT.md'))).toBe(true);
       expect(existsSync(join(projectDir, 'evals/add-greeting/EVAL.ts'))).toBe(true);
       expect(existsSync(join(projectDir, 'evals/add-greeting/package.json'))).toBe(true);
@@ -51,6 +53,7 @@ describe.skipIf(!process.env.INTEGRATION_TEST)('integration tests', () => {
       const pkg = JSON.parse(readFileSync(join(projectDir, 'package.json'), 'utf-8'));
       expect(pkg.name).toBe('test-project');
       expect(pkg.type).toBe('module');
+      expect(pkg.scripts['eval:codex']).toBeDefined();
     });
 
     it('can load fixtures from generated project', () => {
@@ -64,21 +67,71 @@ describe.skipIf(!process.env.INTEGRATION_TEST)('integration tests', () => {
       expect(fixtures[0].name).toBe('add-greeting');
     });
 
-    it('can load experiment config from generated project', async () => {
+    it('can load Claude Code experiment config from generated project', async () => {
       const projectDir = join(TEST_DIR, 'test-project');
       const configPath = join(projectDir, 'experiments/default.ts');
 
       const config = await loadConfig(configPath);
 
       expect(config.agent).toBe('claude-code');
-      expect(config.model).toBe('haiku');
+      expect(config.model).toBe('sonnet');
+    });
+
+    it('can load Codex experiment config from generated project', async () => {
+      const projectDir = join(TEST_DIR, 'test-project');
+      const configPath = join(projectDir, 'experiments/codex.ts');
+
+      const config = await loadConfig(configPath);
+
+      expect(config.agent).toBe('codex');
+      expect(config.model).toBe('openai/gpt-5.2-codex');
     });
   });
 
-  describe.skipIf(!hasCredentials)('sandbox execution', () => {
-    it('can run a simple eval with Claude', async () => {
+  describe.skipIf(!hasCredentials)('Claude Code sandbox execution', () => {
+    it('surfaces CLI error when invalid model is provided', async () => {
       // Create a simple test fixture
-      const fixtureDir = join(TEST_DIR, 'simple-eval');
+      const fixtureDir = join(TEST_DIR, 'invalid-model-claude');
+      mkdirSync(join(fixtureDir, 'src'), { recursive: true });
+
+      writeFileSync(join(fixtureDir, 'PROMPT.md'), 'Say hello');
+      writeFileSync(
+        join(fixtureDir, 'EVAL.ts'),
+        `
+import { test, expect } from 'vitest';
+test('dummy', () => expect(true).toBe(true));
+`
+      );
+      writeFileSync(
+        join(fixtureDir, 'package.json'),
+        JSON.stringify({
+          name: 'invalid-model-claude',
+          type: 'module',
+          devDependencies: { vitest: '^2.1.0' },
+        })
+      );
+      writeFileSync(join(fixtureDir, 'src/index.ts'), '');
+
+      const fixture = loadFixture(TEST_DIR, 'invalid-model-claude');
+
+      const result = await runSingleEval(fixture, {
+        agent: 'claude-code',
+        model: 'invalid-model-xyz',
+        timeout: 60,
+        apiKey: process.env.AI_GATEWAY_API_KEY!,
+        scripts: [],
+      });
+
+      // Should fail with CLI error about invalid model
+      expect(result.result.status).toBe('failed');
+      expect(result.result.error).toBeDefined();
+      // Error from CLI/API should mention the invalid model
+      expect(result.result.error).toContain('invalid-model-xyz');
+    }, 120000);
+
+    it('can run a simple eval with Claude Code', async () => {
+      // Create a simple test fixture
+      const fixtureDir = join(TEST_DIR, 'simple-eval-claude');
       mkdirSync(join(fixtureDir, 'src'), { recursive: true });
 
       writeFileSync(
@@ -100,7 +153,7 @@ test('greet exists', () => {
       writeFileSync(
         join(fixtureDir, 'package.json'),
         JSON.stringify({
-          name: 'simple-eval',
+          name: 'simple-eval-claude',
           type: 'module',
           scripts: { build: 'tsc' },
           devDependencies: { typescript: '^5.0.0', vitest: '^2.1.0' },
@@ -120,39 +173,215 @@ test('greet exists', () => {
       );
       writeFileSync(join(fixtureDir, 'src/index.ts'), '// TODO: implement');
 
-      const fixture = loadFixture(TEST_DIR, 'simple-eval');
+      const fixture = loadFixture(TEST_DIR, 'simple-eval-claude');
 
       const result = await runSingleEval(fixture, {
-        model: 'haiku',
+        agent: 'claude-code',
+        model: 'sonnet',
         timeout: 120,
-        apiKey: process.env.ANTHROPIC_API_KEY!,
+        apiKey: process.env.AI_GATEWAY_API_KEY!,
         scripts: ['build'],
       });
 
-      // The eval should have run (success or failure depends on agent behavior)
-      expect(result.duration).toBeGreaterThan(0);
+      // Verify result structure
+      expect(result.result.duration).toBeGreaterThan(0);
+      expect(result.result.status).toBeDefined();
+      expect(['passed', 'failed']).toContain(result.result.status);
+
+      // Verify output content exists (if available)
+      if (result.outputContent) {
+        expect(typeof result.outputContent).toBe('object');
+      }
+    }, 300000); // 5 minute timeout
+  });
+
+  describe.skipIf(!hasCredentials)('Codex sandbox execution', () => {
+    it('can run a simple eval with Codex', async () => {
+      // Create a simple test fixture
+      const fixtureDir = join(TEST_DIR, 'simple-eval-codex');
+      mkdirSync(join(fixtureDir, 'src'), { recursive: true });
+
+      writeFileSync(
+        join(fixtureDir, 'PROMPT.md'),
+        'Add a function called greet that returns "Hello!"'
+      );
+      writeFileSync(
+        join(fixtureDir, 'EVAL.ts'),
+        `
+import { test, expect } from 'vitest';
+import { readFileSync } from 'fs';
+
+test('greet exists', () => {
+  const content = readFileSync('src/index.ts', 'utf-8');
+  expect(content).toContain('greet');
+});
+`
+      );
+      writeFileSync(
+        join(fixtureDir, 'package.json'),
+        JSON.stringify({
+          name: 'simple-eval-codex',
+          type: 'module',
+          scripts: { build: 'tsc' },
+          devDependencies: { typescript: '^5.0.0', vitest: '^2.1.0' },
+        })
+      );
+      writeFileSync(
+        join(fixtureDir, 'tsconfig.json'),
+        JSON.stringify({
+          compilerOptions: {
+            target: 'ES2020',
+            module: 'ESNext',
+            moduleResolution: 'bundler',
+            outDir: 'dist',
+          },
+          include: ['src'],
+        })
+      );
+      writeFileSync(join(fixtureDir, 'src/index.ts'), '// TODO: implement');
+
+      const fixture = loadFixture(TEST_DIR, 'simple-eval-codex');
+
+      const result = await runSingleEval(fixture, {
+        agent: 'codex',
+        model: 'openai/gpt-5.2-codex',
+        timeout: 120,
+        apiKey: process.env.AI_GATEWAY_API_KEY!,
+        scripts: ['build'],
+      });
+
+      // Verify result structure
+      expect(result.result.duration).toBeGreaterThan(0);
+      expect(result.result.status).toBeDefined();
+      expect(['passed', 'failed']).toContain(result.result.status);
+
+      // Verify output content exists (if available)
+      if (result.outputContent) {
+        expect(typeof result.outputContent).toBe('object');
+      }
+
+      // Verify transcript is captured (if available)
+      if (result.transcript) {
+        expect(typeof result.transcript).toBe('string');
+      }
+    }, 300000); // 5 minute timeout
+
+    it('verifies result output structure matches expected format', async () => {
+      // Create a simple test fixture
+      const fixtureDir = join(TEST_DIR, 'result-structure-codex');
+      mkdirSync(join(fixtureDir, 'src'), { recursive: true });
+
+      writeFileSync(
+        join(fixtureDir, 'PROMPT.md'),
+        'Create a simple hello.ts file that exports a greeting constant.'
+      );
+      writeFileSync(
+        join(fixtureDir, 'EVAL.ts'),
+        `
+import { test, expect } from 'vitest';
+import { readFileSync, existsSync } from 'fs';
+
+test('hello.ts exists', () => {
+  expect(existsSync('src/hello.ts')).toBe(true);
+});
+
+test('contains greeting', () => {
+  const content = readFileSync('src/hello.ts', 'utf-8');
+  expect(content).toContain('greeting');
+});
+`
+      );
+      writeFileSync(
+        join(fixtureDir, 'package.json'),
+        JSON.stringify({
+          name: 'result-structure-codex',
+          type: 'module',
+          scripts: { build: 'tsc' },
+          devDependencies: { typescript: '^5.0.0', vitest: '^2.1.0' },
+        })
+      );
+      writeFileSync(
+        join(fixtureDir, 'tsconfig.json'),
+        JSON.stringify({
+          compilerOptions: {
+            target: 'ES2020',
+            module: 'ESNext',
+            moduleResolution: 'bundler',
+            outDir: 'dist',
+          },
+          include: ['src'],
+        })
+      );
+
+      const fixture = loadFixture(TEST_DIR, 'result-structure-codex');
+
+      const result = await runSingleEval(fixture, {
+        agent: 'codex',
+        model: 'openai/gpt-5.2-codex',
+        timeout: 120,
+        apiKey: process.env.AI_GATEWAY_API_KEY!,
+        scripts: ['build'],
+      });
+
+      // Verify EvalRunData structure
+      expect(result).toHaveProperty('result');
+      expect(result.result).toHaveProperty('status');
+      expect(result.result).toHaveProperty('duration');
+
+      // Verify optional properties have correct types when present
+      if (result.result.error) {
+        expect(typeof result.result.error).toBe('string');
+      }
+
+      // Verify transcript structure if present
+      if (result.transcript) {
+        expect(typeof result.transcript).toBe('string');
+        // Codex uses JSON format
+        try {
+          JSON.parse(result.transcript);
+        } catch {
+          // It's fine if it's not valid JSON - transcript format may vary
+        }
+      }
+
+      // Verify output content structure if present
+      if (result.outputContent) {
+        if (result.outputContent.tests) {
+          expect(typeof result.outputContent.tests).toBe('string');
+        }
+        if (result.outputContent.build) {
+          expect(typeof result.outputContent.build).toBe('string');
+        }
+      }
     }, 300000); // 5 minute timeout
   });
 
   describe('CLI commands', () => {
-    it('can list evals via CLI', () => {
+    it('can dry run Claude Code experiment via CLI', () => {
       const projectDir = join(TEST_DIR, 'test-project');
-      const result = execSync(`npx tsx ${process.cwd()}/src/cli.ts list --evals-dir ${projectDir}/evals`, {
-        encoding: 'utf-8',
-      });
-
-      expect(result).toContain('add-greeting');
-    });
-
-    it('can dry run experiment via CLI', () => {
-      const projectDir = join(TEST_DIR, 'test-project');
+      // Config at experiments/default.ts -> evals inferred at ../evals
       const result = execSync(
-        `npx tsx ${process.cwd()}/src/cli.ts run ${projectDir}/experiments/default.ts --dry --evals-dir ../evals`,
+        `npx tsx ${process.cwd()}/src/cli.ts run ${projectDir}/experiments/default.ts --dry`,
         { encoding: 'utf-8' }
       );
 
       expect(result).toContain('DRY RUN');
       expect(result).toContain('add-greeting');
+      expect(result).toContain('Agent: claude-code');
+    });
+
+    it('can dry run Codex experiment via CLI', () => {
+      const projectDir = join(TEST_DIR, 'test-project');
+      // Config at experiments/codex.ts -> evals inferred at ../evals
+      const result = execSync(
+        `npx tsx ${process.cwd()}/src/cli.ts run ${projectDir}/experiments/codex.ts --dry`,
+        { encoding: 'utf-8' }
+      );
+
+      expect(result).toContain('DRY RUN');
+      expect(result).toContain('add-greeting');
+      expect(result).toContain('Agent: codex');
+      expect(result).toContain('Model: openai/gpt-5.2-codex');
     });
   });
 });

@@ -35,10 +35,10 @@ function getPackageJson(projectName: string): string {
       type: 'module',
       scripts: {
         eval: 'npx agent-eval run experiments/default.ts',
-        'eval:list': 'npx agent-eval list',
+        'eval:codex': 'npx agent-eval run experiments/codex.ts',
       },
       devDependencies: {
-        '@judegao/eval': '^0.1.10',
+        '@judegao/eval': '^1.0.0',
         '@types/node': '^22.0.0',
         typescript: '^5.6.0',
         vitest: '^2.1.0',
@@ -53,10 +53,12 @@ function getPackageJson(projectName: string): string {
  * Get the .env.example template.
  */
 function getEnvExample(): string {
-  return `# Required - Anthropic API key for Claude
-ANTHROPIC_API_KEY=sk-ant-...
+  return `# Required - Vercel AI Gateway API key (works for all agents)
+# Get yours at: https://vercel.com/dashboard -> AI Gateway
+AI_GATEWAY_API_KEY=your-ai-gateway-api-key
 
 # Required - Vercel token for sandbox access
+# Create at: https://vercel.com/account/tokens
 VERCEL_TOKEN=your-vercel-token
 
 # Or use OIDC token if your organization uses that
@@ -79,17 +81,47 @@ results/
 }
 
 /**
- * Get the default experiment configuration template.
+ * Get the default experiment configuration template (Claude Code).
  */
 function getDefaultExperiment(): string {
   return `import type { ExperimentConfig } from '@judegao/eval';
 
 const config: ExperimentConfig = {
-  // Which AI agent to use (currently only 'claude-code' supported)
+  // Which AI agent to use: 'claude-code' or 'codex'
   agent: 'claude-code',
 
-  // Which model to use: 'opus', 'sonnet', or 'haiku'
-  model: 'haiku',
+  // Which model to use (e.g., 'sonnet', 'haiku', 'opus', or any model ID)
+  model: 'sonnet',
+
+  // How many times to run each eval (for measuring reliability)
+  runs: 1,
+
+  // Stop after first success? Set to false for reliability measurement
+  earlyExit: true,
+
+  // npm scripts that must pass after agent finishes
+  scripts: ['build'],
+
+  // Maximum time in seconds for agent to complete
+  timeout: 300,
+};
+
+export default config;
+`;
+}
+
+/**
+ * Get the Codex experiment configuration template.
+ */
+function getCodexExperiment(): string {
+  return `import type { ExperimentConfig } from '@judegao/eval';
+
+const config: ExperimentConfig = {
+  // Which AI agent to use: 'claude-code' or 'codex'
+  agent: 'codex',
+
+  // Which model to use (e.g., 'openai/gpt-5.2-codex', 'openai/o3', or any model ID)
+  model: 'openai/gpt-5.2-codex',
 
   // How many times to run each eval (for measuring reliability)
   runs: 1,
@@ -237,6 +269,7 @@ function getTemplateFiles(projectName: string): TemplateFile[] {
     { path: '.env.example', content: getEnvExample() },
     { path: '.gitignore', content: getGitignore() },
     { path: 'experiments/default.ts', content: getDefaultExperiment() },
+    { path: 'experiments/codex.ts', content: getCodexExperiment() },
     { path: 'evals/add-greeting/PROMPT.md', content: getExamplePrompt() },
     { path: 'evals/add-greeting/EVAL.ts', content: getExampleEval() },
     { path: 'evals/add-greeting/package.json', content: getExamplePackageJson() },
