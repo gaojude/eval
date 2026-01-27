@@ -187,7 +187,7 @@ describe('results utilities', () => {
           {
             result: { status: 'passed', duration: 10 },
             transcript: '{"role":"assistant"}',
-            outputs: { './src/App.tsx': 'export const App = () => <div>Hello</div>;' },
+            outputContent: { tests: 'Test output here', build: 'Build output here' },
           },
           { result: { status: 'failed', duration: 8, error: 'Error' } },
         ]),
@@ -220,17 +220,23 @@ describe('results utilities', () => {
       // No transcript for run-2
       expect(existsSync(join(outputDir, 'eval-1', 'run-2', 'transcript.jsonl'))).toBe(false);
 
-      // Check outputs/ directory exists and contains files
+      // Check outputs/ directory exists and contains script output files
       expect(existsSync(join(outputDir, 'eval-1', 'run-1', 'outputs'))).toBe(true);
-      expect(existsSync(join(outputDir, 'eval-1', 'run-2', 'outputs'))).toBe(true);
+      expect(existsSync(join(outputDir, 'eval-1', 'run-1', 'outputs', 'tests.txt'))).toBe(true);
+      expect(existsSync(join(outputDir, 'eval-1', 'run-1', 'outputs', 'build.txt'))).toBe(true);
 
-      // Verify generated files are saved to outputs/
-      expect(existsSync(join(outputDir, 'eval-1', 'run-1', 'outputs', 'src', 'App.tsx'))).toBe(true);
-      const outputContent = readFileSync(
-        join(outputDir, 'eval-1', 'run-1', 'outputs', 'src', 'App.tsx'),
+      // Verify output file content
+      const testsOutput = readFileSync(
+        join(outputDir, 'eval-1', 'run-1', 'outputs', 'tests.txt'),
         'utf-8'
       );
-      expect(outputContent).toBe('export const App = () => <div>Hello</div>;');
+      expect(testsOutput).toBe('Test output here');
+
+      const buildOutput = readFileSync(
+        join(outputDir, 'eval-1', 'run-1', 'outputs', 'build.txt'),
+        'utf-8'
+      );
+      expect(buildOutput).toBe('Build output here');
 
       // Verify experiment.json content
       const experimentJson = JSON.parse(
@@ -250,16 +256,21 @@ describe('results utilities', () => {
       expect(summaryJson.name).toBeUndefined();
       expect(summaryJson.runs).toBeUndefined();
 
-      // Verify result.json format (per design: status, failedStep, error, duration only)
+      // Verify result.json format with paths
       const resultJson = JSON.parse(
         readFileSync(join(outputDir, 'eval-1', 'run-1', 'result.json'), 'utf-8')
       );
       expect(resultJson.status).toBe('passed');
       expect(resultJson.duration).toBe(10);
-      // Should NOT have transcript or other fields
+      // Should have paths to transcript and outputs
+      expect(resultJson.transcriptPath).toBe('transcript.jsonl');
+      expect(resultJson.outputPaths).toEqual({
+        tests: 'outputs/tests.txt',
+        build: 'outputs/build.txt',
+      });
+      // Should NOT have raw content
       expect(resultJson.transcript).toBeUndefined();
-      expect(resultJson.agentOutput).toBeUndefined();
-      expect(resultJson.scriptResults).toBeUndefined();
+      expect(resultJson.outputContent).toBeUndefined();
 
       // Verify transcript.jsonl content
       const transcriptContent = readFileSync(

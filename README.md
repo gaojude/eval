@@ -282,7 +282,7 @@ results/
         run-1/
           result.json      ← Individual run details
           transcript.jsonl ← Agent conversation log
-          outputs/         ← Generated files
+          outputs/         ← Script/test output files
         run-2/
           result.json
           transcript.jsonl
@@ -291,13 +291,18 @@ results/
 
 ### Result Files
 
-**result.json** - Execution metadata:
+**result.json** - Execution metadata with paths to outputs:
 ```json
 {
   "status": "failed",
   "failedStep": "tests",
   "error": "Test failed: expected 'Logout' to be in navbar",
-  "duration": 45.2
+  "duration": 45.2,
+  "transcriptPath": "transcript.jsonl",
+  "outputPaths": {
+    "tests": "outputs/tests.txt",
+    "build": "outputs/build.txt"
+  }
 }
 ```
 
@@ -336,7 +341,7 @@ results/
 
 2. Check `transcript.jsonl` to see what the agent did
 
-3. Check `outputs/` for generated files
+3. Check `outputs/` for full script/test output (e.g., `tests.txt`, `build.txt`)
 
 ## Cost Estimation
 

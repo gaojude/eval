@@ -22,7 +22,7 @@ const program = new Command();
 program
   .name('agent-eval')
   .description('Framework for testing AI coding agents in isolated sandboxes')
-  .version('0.1.9');
+  .version('0.1.10');
 
 /**
  * init command - Create a new eval project

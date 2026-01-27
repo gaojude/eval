@@ -122,18 +122,28 @@ export interface EvalRunResult {
   error?: string;
   /** Duration in seconds */
   duration: number;
+  /** Path to transcript file (relative to run directory) */
+  transcriptPath?: string;
+  /** Paths to output files (relative to run directory) */
+  outputPaths?: {
+    tests?: string;
+    [scriptName: string]: string | undefined;
+  };
 }
 
 /**
- * Internal run data including transcript (not saved to result.json).
+ * Internal run data including transcript and outputs (content, not paths).
  */
 export interface EvalRunData {
-  /** The eval result (saved to result.json) */
+  /** The eval result (will have paths added when saving) */
   result: EvalRunResult;
   /** Structured transcript from Claude Code (saved to transcript.jsonl) */
   transcript?: string;
-  /** Files generated/modified by the agent (saved to outputs/) */
-  outputs?: Record<string, string>;
+  /** Script/test output content (saved to outputs/) */
+  outputContent?: {
+    tests?: string;
+    [scriptName: string]: string | undefined;
+  };
 }
 
 /**

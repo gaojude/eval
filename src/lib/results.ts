@@ -18,6 +18,19 @@ import type { AgentRunResult } from './agent.js';
  * Convert AgentRunResult to EvalRunData (result + transcript).
  */
 export function agentResultToEvalRunData(agentResult: AgentRunResult): EvalRunData {
+  // Collect output content from scripts and tests
+  const outputContent: EvalRunData['outputContent'] = {};
+
+  if (agentResult.testOutput) {
+    outputContent.tests = agentResult.testOutput;
+  }
+  if (agentResult.buildOutput) {
+    outputContent.build = agentResult.buildOutput;
+  }
+  if (agentResult.lintOutput) {
+    outputContent.lint = agentResult.lintOutput;
+  }
+
   return {
     result: {
       status: agentResult.success ? 'passed' : 'failed',
@@ -28,7 +41,7 @@ export function agentResultToEvalRunData(agentResult: AgentRunResult): EvalRunDa
       duration: agentResult.duration / 1000, // Convert to seconds
     },
     transcript: agentResult.transcript,
-    outputs: agentResult.generatedFiles,
+    outputContent: Object.keys(outputContent).length > 0 ? outputContent : undefined,
   };
 }
 
@@ -152,30 +165,40 @@ export function saveResults(
       const runDir = join(evalDir, `run-${i + 1}`);
       mkdirSync(runDir, { recursive: true });
 
-      // Save result.json (just the result fields)
-      writeFileSync(
-        join(runDir, 'result.json'),
-        JSON.stringify(runData.result, null, 2)
-      );
+      // Build the result with paths
+      const resultWithPaths = { ...runData.result };
 
       // Save transcript.jsonl if available
       if (runData.transcript) {
         writeFileSync(join(runDir, 'transcript.jsonl'), runData.transcript);
+        resultWithPaths.transcriptPath = 'transcript.jsonl';
       }
 
-      // Save generated files to outputs/
+      // Save script/test outputs to outputs/
       const outputsDir = join(runDir, 'outputs');
       mkdirSync(outputsDir, { recursive: true });
-      if (runData.outputs) {
-        for (const [filePath, content] of Object.entries(runData.outputs)) {
-          // Normalize path (remove leading ./ if present)
-          const normalizedPath = filePath.replace(/^\.\//, '');
-          const fullPath = join(outputsDir, normalizedPath);
-          // Create parent directories
-          mkdirSync(dirname(fullPath), { recursive: true });
-          writeFileSync(fullPath, content);
+
+      if (runData.outputContent) {
+        const outputPaths: Record<string, string> = {};
+
+        for (const [name, content] of Object.entries(runData.outputContent)) {
+          if (content) {
+            const fileName = `${name}.txt`;
+            writeFileSync(join(outputsDir, fileName), content);
+            outputPaths[name] = `outputs/${fileName}`;
+          }
+        }
+
+        if (Object.keys(outputPaths).length > 0) {
+          resultWithPaths.outputPaths = outputPaths;
         }
       }
+
+      // Save result.json with paths
+      writeFileSync(
+        join(runDir, 'result.json'),
+        JSON.stringify(resultWithPaths, null, 2)
+      );
     }
   }
 
