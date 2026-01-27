@@ -38,7 +38,7 @@ function getPackageJson(projectName: string): string {
         'eval:list': 'npx agent-eval list',
       },
       devDependencies: {
-        '@judegao/eval': '^0.1.5',
+        '@judegao/eval': '^0.1.6',
         '@types/node': '^22.0.0',
         typescript: '^5.6.0',
         vitest: '^2.1.0',

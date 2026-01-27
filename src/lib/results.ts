@@ -24,6 +24,7 @@ export function agentResultToEvalResult(agentResult: AgentRunResult): EvalRunRes
       : undefined,
     error: agentResult.error,
     duration: agentResult.duration / 1000, // Convert to seconds
+    agentOutput: agentResult.output,
     scriptResults: [
       ...(agentResult.buildSuccess !== undefined
         ? [{ name: 'build', success: agentResult.buildSuccess, output: agentResult.buildOutput }]

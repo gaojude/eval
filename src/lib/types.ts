@@ -122,6 +122,8 @@ export interface EvalRunResult {
   error?: string;
   /** Duration in seconds */
   duration: number;
+  /** Raw output/transcript from the agent */
+  agentOutput?: string;
   /** Individual script results */
   scriptResults?: Array<{
     name: string;
