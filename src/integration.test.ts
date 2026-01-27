@@ -9,10 +9,14 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { mkdirSync, writeFileSync, rmSync, existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { execSync } from 'child_process';
+import { config as dotenvConfig } from 'dotenv';
 import { initProject } from './lib/init.js';
 import { loadFixture, loadAllFixtures } from './lib/fixture.js';
 import { runSingleEval } from './lib/runner.js';
 import { loadConfig } from './lib/config.js';
+
+// Load .env file
+dotenvConfig();
 
 const TEST_DIR = '/tmp/eval-framework-integration-test';
 const hasCredentials =
