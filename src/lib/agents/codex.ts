@@ -147,6 +147,17 @@ export function createCodexAgent({ useVercelAiGateway }: { useVercelAiGateway: b
         runtime: 'node24',
       });
 
+      // Check for abort after sandbox creation (abort may have fired during create)
+      if (aborted) {
+        return {
+          success: false,
+          output: '',
+          error: 'Aborted',
+          duration: Date.now() - startTime,
+          sandboxId: sandbox.sandboxId,
+        };
+      }
+
       // Upload workspace files (excluding tests)
       await sandbox.uploadFiles(workspaceFiles);
 
