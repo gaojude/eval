@@ -103,11 +103,13 @@ export function createCodexAgent({ useVercelAiGateway }: { useVercelAiGateway: b
     let sandbox: SandboxManager | null = null;
     let agentOutput = '';
     let aborted = false;
+    let sandboxStopped = false;
 
     // Handle abort signal
     const abortHandler = () => {
       aborted = true;
-      if (sandbox) {
+      if (sandbox && !sandboxStopped) {
+        sandboxStopped = true;
         sandbox.stop().catch(() => {});
       }
     };
@@ -274,7 +276,8 @@ IMPORTANT: Do not run npm, pnpm, yarn, or any package manager commands. Dependen
       if (options.signal) {
         options.signal.removeEventListener('abort', abortHandler);
       }
-      if (sandbox) {
+      if (sandbox && !sandboxStopped) {
+        sandboxStopped = true;
         await sandbox.stop();
       }
     }
