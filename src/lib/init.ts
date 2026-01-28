@@ -33,10 +33,6 @@ function getPackageJson(projectName: string): string {
       version: '0.0.1',
       private: true,
       type: 'module',
-      scripts: {
-        eval: 'npx agent-eval run experiments/default.ts',
-        'eval:codex': 'npx agent-eval run experiments/codex.ts',
-      },
       devDependencies: {
         '@judegao/eval': '^1.0.0',
         '@types/node': '^22.0.0',
@@ -83,29 +79,14 @@ results/
 /**
  * Get the default experiment configuration template (Claude Code).
  */
-function getDefaultExperiment(): string {
+function getCCExperiment(): string {
   return `import type { ExperimentConfig } from '@judegao/eval';
 
 const config: ExperimentConfig = {
-  // Which AI agent to use: 'claude-code' or 'codex'
-  // Add 'vercel-ai-gateway/' prefix to use Vercel AI Gateway
   agent: 'vercel-ai-gateway/claude-code',
-
-  // Which model to use (defaults to 'opus' for claude-code, 'openai/gpt-5.2-codex' for codex)
-  // Options for claude-code: 'opus', 'sonnet', 'haiku', or any Anthropic model ID
-  // Options for codex: 'openai/gpt-5.2-codex', 'openai/o3', or any OpenAI model ID
-  // model: 'opus',  // Uncomment to override default
-
-  // How many times to run each eval (for measuring reliability)
   runs: 1,
-
-  // Stop after first success? Set to false for reliability measurement
   earlyExit: true,
-
-  // npm scripts that must pass after agent finishes
   scripts: ['build'],
-
-  // Maximum time in seconds for agent to complete
   timeout: 300,
 };
 
@@ -120,24 +101,10 @@ function getCodexExperiment(): string {
   return `import type { ExperimentConfig } from '@judegao/eval';
 
 const config: ExperimentConfig = {
-  // Which AI agent to use: 'claude-code' or 'codex'
-  // Add 'vercel-ai-gateway/' prefix to use Vercel AI Gateway
   agent: 'vercel-ai-gateway/codex',
-
-  // Which model to use (defaults to 'openai/gpt-5.2-codex' for codex)
-  // Options: 'openai/gpt-5.2-codex', 'openai/o3', or any OpenAI model ID
-  // model: 'openai/gpt-5.2-codex',  // Uncomment to override default
-
-  // How many times to run each eval (for measuring reliability)
   runs: 1,
-
-  // Stop after first success? Set to false for reliability measurement
   earlyExit: true,
-
-  // npm scripts that must pass after agent finishes
   scripts: ['build'],
-
-  // Maximum time in seconds for agent to complete
   timeout: 300,
 };
 
@@ -273,7 +240,7 @@ function getTemplateFiles(projectName: string): TemplateFile[] {
     { path: 'tsconfig.json', content: getRootTsconfig() },
     { path: '.env.example', content: getEnvExample() },
     { path: '.gitignore', content: getGitignore() },
-    { path: 'experiments/default.ts', content: getDefaultExperiment() },
+    { path: 'experiments/cc.ts', content: getCCExperiment() },
     { path: 'experiments/codex.ts', content: getCodexExperiment() },
     { path: 'evals/add-greeting/PROMPT.md', content: getExamplePrompt() },
     { path: 'evals/add-greeting/EVAL.ts', content: getExampleEval() },
@@ -325,7 +292,7 @@ Next steps:
   1. cd ${projectName}
   2. npm install
   3. Copy .env.example to .env and add your API keys
-  4. npm run eval
+  4. npx agent-eval
 
 For more information, see the documentation at:
   https://github.com/gaojude/eval

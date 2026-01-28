@@ -44,8 +44,9 @@ function extractTranscriptFromOutput(output: string): string | undefined {
 
 /**
  * Generate Codex config.toml content.
+ * For direct mode, we embed the API key directly since env_key doesn't work reliably in the sandbox.
  */
-function generateCodexConfig(model: string, useVercelAiGateway: boolean): string {
+function generateCodexConfig(model: string, useVercelAiGateway: boolean, apiKey?: string): string {
   const fullModel = model.includes('/') ? model : `openai/${model}`;
 
   if (useVercelAiGateway) {
@@ -63,13 +64,15 @@ model_provider = "vercel"
 model = "${fullModel}"
 `;
   } else {
+    // For direct mode, embed the API key directly in config
+    // This is safe because the sandbox is ephemeral and isolated
     return `# Direct OpenAI API configuration
 profile = "default"
 
 [model_providers.openai]
 name = "OpenAI"
 base_url = "${OPENAI_DIRECT.baseUrl}"
-env_key = "${OPENAI_DIRECT.apiKeyEnvVar}"
+api_key = "${apiKey}"
 wire_api = "chat"
 
 [profiles.default]
@@ -137,7 +140,11 @@ export function createCodexAgent({ useVercelAiGateway }: { useVercelAiGateway: b
 
       // Create Codex config directory and config file
       await sandbox.runShell('mkdir -p ~/.codex');
-      const configContent = generateCodexConfig(options.model, useVercelAiGateway);
+      const configContent = generateCodexConfig(
+        options.model,
+        useVercelAiGateway,
+        useVercelAiGateway ? undefined : options.apiKey
+      );
       await sandbox.runShell(`cat > ~/.codex/config.toml << 'EOF'
 ${configContent}
 EOF`);

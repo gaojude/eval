@@ -37,18 +37,17 @@ describe('init utilities', () => {
       expect(existsSync(join(projectDir, 'evals'))).toBe(true);
     });
 
-    it('creates default experiment config', () => {
+    it('creates Claude Code experiment config', () => {
       const projectDir = initProject({
         name: 'test-project',
         targetDir: TEST_DIR,
       });
 
-      const configPath = join(projectDir, 'experiments/default.ts');
+      const configPath = join(projectDir, 'experiments/cc.ts');
       expect(existsSync(configPath)).toBe(true);
 
       const content = readFileSync(configPath, 'utf-8');
       expect(content).toContain("agent: 'vercel-ai-gateway/claude-code'");
-      expect(content).toContain("// model: 'opus',  // Uncomment to override default");
     });
 
     it('creates example eval fixture', () => {
@@ -76,7 +75,7 @@ describe('init utilities', () => {
 
       expect(pkg.name).toBe('custom-name');
       expect(pkg.type).toBe('module');
-      expect(pkg.scripts.eval).toBeDefined();
+      expect(pkg.scripts).toBeUndefined();
     });
 
     it('creates eval fixture with type: module', () => {

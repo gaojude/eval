@@ -51,7 +51,7 @@ describe('CLI', () => {
 
     it('shows version with --version flag', () => {
       const result = runCli(['--version']);
-      expect(result.stdout).toContain('1.0.0');
+      expect(result.stdout).toContain('1.1.1');
     });
   });
 
@@ -71,7 +71,7 @@ describe('CLI', () => {
 
       // Create config file in experiments/
       const configContent = `export default { agent: 'claude-code' };`;
-      writeFileSync(join(experimentsDir, 'default.ts'), configContent);
+      writeFileSync(join(experimentsDir, 'cc.ts'), configContent);
 
       // Create evals directory with valid fixture
       const evalsDir = join(projectDir, 'evals');
@@ -82,8 +82,32 @@ describe('CLI', () => {
       writeFileSync(join(fixture, 'EVAL.ts'), 'test code');
       writeFileSync(join(fixture, 'package.json'), JSON.stringify({ type: 'module' }));
 
-      const result = runCli(['run', 'experiments/default.ts', '--dry'], projectDir);
+      const result = runCli(['experiments/cc.ts', '--dry'], projectDir);
       expect(result.stdout).toContain('my-eval');
+      expect(result.stdout).toContain('DRY RUN');
+      expect(result.exitCode).toBe(0);
+    });
+
+    it('supports shorthand config names (dry run)', () => {
+      // Create project structure
+      const projectDir = join(TEST_DIR, 'shorthand-project');
+      const experimentsDir = join(projectDir, 'experiments');
+      mkdirSync(experimentsDir, { recursive: true });
+
+      const configContent = `export default { agent: 'claude-code' };`;
+      writeFileSync(join(experimentsDir, 'cc.ts'), configContent);
+
+      const evalsDir = join(projectDir, 'evals');
+      mkdirSync(evalsDir);
+      const fixture = join(evalsDir, 'test-eval');
+      mkdirSync(fixture);
+      writeFileSync(join(fixture, 'PROMPT.md'), 'Test task');
+      writeFileSync(join(fixture, 'EVAL.ts'), 'test code');
+      writeFileSync(join(fixture, 'package.json'), JSON.stringify({ type: 'module' }));
+
+      // Use shorthand: "cc" instead of "experiments/cc.ts"
+      const result = runCli(['cc', '--dry'], projectDir);
+      expect(result.stdout).toContain('test-eval');
       expect(result.stdout).toContain('DRY RUN');
       expect(result.exitCode).toBe(0);
     });
@@ -95,13 +119,13 @@ describe('CLI', () => {
       mkdirSync(experimentsDir, { recursive: true });
 
       const configContent = `export default { agent: 'claude-code' };`;
-      writeFileSync(join(experimentsDir, 'default.ts'), configContent);
+      writeFileSync(join(experimentsDir, 'cc.ts'), configContent);
 
       // Create empty evals directory
       const evalsDir = join(projectDir, 'evals');
       mkdirSync(evalsDir);
 
-      const result = runCli(['run', 'experiments/default.ts'], projectDir);
+      const result = runCli(['experiments/cc.ts'], projectDir);
       expect(result.stderr).toContain('No valid eval fixtures');
       expect(result.exitCode).toBe(1);
     });
@@ -114,12 +138,12 @@ describe('CLI', () => {
 
       // Create invalid config (missing agent)
       const configContent = `export default { model: 'opus' };`;
-      writeFileSync(join(experimentsDir, 'default.ts'), configContent);
+      writeFileSync(join(experimentsDir, 'cc.ts'), configContent);
 
       const evalsDir = join(projectDir, 'evals');
       mkdirSync(evalsDir);
 
-      const result = runCli(['run', 'experiments/default.ts'], projectDir);
+      const result = runCli(['experiments/cc.ts'], projectDir);
       expect(result.stderr.toLowerCase()).toContain('error');
       expect(result.exitCode).toBe(1);
     });

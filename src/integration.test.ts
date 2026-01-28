@@ -46,7 +46,7 @@ describe.skipIf(!process.env.INTEGRATION_TEST)('integration tests', () => {
 
       // Verify structure
       expect(existsSync(join(projectDir, 'package.json'))).toBe(true);
-      expect(existsSync(join(projectDir, 'experiments/default.ts'))).toBe(true);
+      expect(existsSync(join(projectDir, 'experiments/cc.ts'))).toBe(true);
       expect(existsSync(join(projectDir, 'experiments/codex.ts'))).toBe(true);
       expect(existsSync(join(projectDir, 'evals/add-greeting/PROMPT.md'))).toBe(true);
       expect(existsSync(join(projectDir, 'evals/add-greeting/EVAL.ts'))).toBe(true);
@@ -56,7 +56,7 @@ describe.skipIf(!process.env.INTEGRATION_TEST)('integration tests', () => {
       const pkg = JSON.parse(readFileSync(join(projectDir, 'package.json'), 'utf-8'));
       expect(pkg.name).toBe('test-project');
       expect(pkg.type).toBe('module');
-      expect(pkg.scripts['eval:codex']).toBeDefined();
+      expect(pkg.scripts).toBeUndefined();
     });
 
     it('can load fixtures from generated project', () => {
@@ -72,7 +72,7 @@ describe.skipIf(!process.env.INTEGRATION_TEST)('integration tests', () => {
 
     it('can load Claude Code experiment config from generated project', async () => {
       const projectDir = join(TEST_DIR, 'test-project');
-      const configPath = join(projectDir, 'experiments/default.ts');
+      const configPath = join(projectDir, 'experiments/cc.ts');
 
       const config = await loadConfig(configPath);
 
@@ -559,9 +559,9 @@ test('hello.ts exists', () => {
   describe('CLI commands', () => {
     it('can dry run Claude Code experiment via CLI', () => {
       const projectDir = join(TEST_DIR, 'test-project');
-      // Config at experiments/default.ts -> evals inferred at ../evals
+      // Config at experiments/cc.ts -> evals inferred at ../evals
       const result = execSync(
-        `npx tsx ${process.cwd()}/src/cli.ts run ${projectDir}/experiments/default.ts --dry`,
+        `npx tsx ${process.cwd()}/src/cli.ts ${projectDir}/experiments/cc.ts --dry`,
         { encoding: 'utf-8' }
       );
 
@@ -574,7 +574,7 @@ test('hello.ts exists', () => {
       const projectDir = join(TEST_DIR, 'test-project');
       // Config at experiments/codex.ts -> evals inferred at ../evals
       const result = execSync(
-        `npx tsx ${process.cwd()}/src/cli.ts run ${projectDir}/experiments/codex.ts --dry`,
+        `npx tsx ${process.cwd()}/src/cli.ts ${projectDir}/experiments/codex.ts --dry`,
         { encoding: 'utf-8' }
       );
 

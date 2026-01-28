@@ -27,10 +27,10 @@ cp .env.example .env
 # Edit .env with your AI_GATEWAY_API_KEY and VERCEL_TOKEN
 
 # Preview what will run (no API calls, no cost)
-npm run eval -- --dry
+npx agent-eval cc --dry
 
 # Run the evals
-npm run eval
+npx agent-eval cc
 ```
 
 ## A/B Testing AI Techniques
@@ -87,12 +87,12 @@ export default config;
 
 ```bash
 # Preview first
-npx @judegao/eval run experiments/control.ts --dry
-npx @judegao/eval run experiments/with-mcp.ts --dry
+npx agent-eval control --dry
+npx agent-eval with-mcp --dry
 
 # Run experiments
-npx @judegao/eval run experiments/control.ts
-npx @judegao/eval run experiments/with-mcp.ts
+npx agent-eval control
+npx agent-eval with-mcp
 ```
 
 **Compare results:**
@@ -234,16 +234,16 @@ Create a new eval project:
 npx @judegao/eval init my-evals
 ```
 
-### `run <config>`
+### `<experiment>`
 
 Run an experiment:
 ```bash
-npx @judegao/eval run experiments/default.ts
+npx agent-eval cc
 ```
 
 **Dry run** - preview without executing (no API calls, no cost):
 ```bash
-npx @judegao/eval run experiments/default.ts --dry
+npx agent-eval cc --dry
 
 # Output:
 # Found 5 valid fixture(s), will run 5:
