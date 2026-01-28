@@ -97,7 +97,9 @@ export interface ResolvedExperimentConfig {
 export const REQUIRED_EVAL_FILES = ['PROMPT.md', 'EVAL.ts', 'package.json'] as const;
 
 /**
- * Files excluded from being copied to sandbox (agent cannot see these).
+ * Files excluded when listing fixture files (used by getFixtureFiles in fixture.ts).
+ * This is for local fixture introspection, NOT for sandbox uploads.
+ * For sandbox file filtering, see TEST_FILE_PATTERNS in sandbox.ts.
  */
 export const EXCLUDED_FILES = ['PROMPT.md', 'EVAL.ts', 'node_modules', '.git'] as const;
 

@@ -53,11 +53,15 @@ function getEnvExample(): string {
 # Get yours at: https://vercel.com/dashboard -> AI Gateway
 AI_GATEWAY_API_KEY=your-ai-gateway-api-key
 
-# Required - Vercel token for sandbox access
+# Required - Vercel token for sandbox access (choose ONE of the options below)
+# The @vercel/sandbox package automatically detects either token.
+
+# Option 1: Personal Access Token (for local development)
 # Create at: https://vercel.com/account/tokens
 VERCEL_TOKEN=your-vercel-token
 
-# Or use OIDC token if your organization uses that
+# Option 2: OIDC Token (for CI/CD pipelines like GitHub Actions)
+# Automatically provided by Vercel's CI integration
 # VERCEL_OIDC_TOKEN=your-oidc-token
 `;
 }

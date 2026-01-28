@@ -14,6 +14,9 @@ export const DEFAULT_SANDBOX_TIMEOUT = 600000;
 
 /**
  * Files to ignore when copying to sandbox.
+ * These are build artifacts and dependencies that shouldn't be uploaded.
+ * Note: This is a general-purpose pattern list used by collectLocalFiles().
+ * For eval-specific exclusions (PROMPT.md, EVAL.ts), see TEST_FILE_PATTERNS.
  */
 export const IGNORED_PATTERNS = [
   '.git',
@@ -28,9 +31,13 @@ export const IGNORED_PATTERNS = [
 ];
 
 /**
- * Test file patterns to withhold from agent.
+ * Test/eval file patterns to withhold from agent during task execution.
+ * These files are uploaded AFTER the agent completes for validation.
+ * - PROMPT.md: Contains the task - agent receives this via CLI argument, not as a file
+ * - EVAL.ts: Validation tests - must be hidden so agent can't "cheat"
+ * - *.test.ts/tsx: Additional test files that shouldn't influence agent
  */
-export const TEST_FILE_PATTERNS = ['*.test.tsx', '*.test.ts', 'EVAL.ts'];
+export const TEST_FILE_PATTERNS = ['*.test.tsx', '*.test.ts', 'EVAL.ts', 'PROMPT.md'];
 
 /**
  * Options for creating a sandbox.
