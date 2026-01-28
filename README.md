@@ -24,7 +24,7 @@ npm install
 
 # Add your API keys
 cp .env.example .env
-# Edit .env with your ANTHROPIC_API_KEY and VERCEL_TOKEN
+# Edit .env with your AI_GATEWAY_API_KEY and VERCEL_TOKEN
 
 # Preview what will run (no API calls, no cost)
 npm run eval -- --dry
@@ -44,8 +44,8 @@ The real power is comparing different approaches. Create multiple experiment con
 import type { ExperimentConfig } from '@judegao/eval';
 
 const config: ExperimentConfig = {
-  agent: 'claude-code',
-  model: 'sonnet',
+  agent: 'vercel-ai-gateway/claude-code',
+  model: 'opus',
   runs: 10,        // Multiple runs for statistical significance
   earlyExit: false, // Run all attempts to measure reliability
 };
@@ -60,8 +60,8 @@ export default config;
 import type { ExperimentConfig } from '@judegao/eval';
 
 const config: ExperimentConfig = {
-  agent: 'claude-code',
-  model: 'sonnet',
+  agent: 'vercel-ai-gateway/claude-code',
+  model: 'opus',
   runs: 10,
   earlyExit: false,
 
@@ -87,12 +87,12 @@ export default config;
 
 ```bash
 # Preview first
-npx agent-eval run experiments/control.ts --dry
-npx agent-eval run experiments/with-mcp.ts --dry
+npx @judegao/eval run experiments/control.ts --dry
+npx @judegao/eval run experiments/with-mcp.ts --dry
 
 # Run experiments
-npx agent-eval run experiments/control.ts
-npx agent-eval run experiments/with-mcp.ts
+npx @judegao/eval run experiments/control.ts
+npx @judegao/eval run experiments/with-mcp.ts
 ```
 
 **Compare results:**
@@ -171,15 +171,32 @@ test('project builds', () => {
 
 ## Configuration Reference
 
+### Agent Selection
+
+Choose your agent and authentication method:
+
+```typescript
+// Vercel AI Gateway (recommended - unified billing & observability)
+agent: 'vercel-ai-gateway/claude-code'  // or 'vercel-ai-gateway/codex'
+
+// Direct API (uses provider keys directly)
+agent: 'claude-code'  // requires ANTHROPIC_API_KEY
+agent: 'codex'        // requires OPENAI_API_KEY
+```
+
+See the Environment Variables section below for setup instructions.
+
+### Full Configuration
+
 ```typescript
 import type { ExperimentConfig } from '@judegao/eval';
 
 const config: ExperimentConfig = {
-  // Required: which agent to use
-  agent: 'claude-code',  // or 'codex'
+  // Required: which agent and authentication to use
+  agent: 'vercel-ai-gateway/claude-code',
 
-  // Model to use (any valid model ID)
-  model: 'sonnet',
+  // Model to use (defaults: 'opus' for claude-code, 'openai/gpt-5.2-codex' for codex)
+  model: 'opus',
 
   // How many times to run each eval
   runs: 10,
@@ -210,23 +227,23 @@ export default config;
 
 ## CLI Commands
 
-### `agent-eval init <name>`
+### `init <name>`
 
 Create a new eval project:
 ```bash
 npx @judegao/eval init my-evals
 ```
 
-### `agent-eval run <config>`
+### `run <config>`
 
 Run an experiment:
 ```bash
-npx agent-eval run experiments/default.ts
+npx @judegao/eval run experiments/default.ts
 ```
 
 **Dry run** - preview without executing (no API calls, no cost):
 ```bash
-npx agent-eval run experiments/default.ts --dry
+npx @judegao/eval run experiments/default.ts --dry
 
 # Output:
 # Found 5 valid fixture(s), will run 5:
@@ -235,7 +252,7 @@ npx agent-eval run experiments/default.ts --dry
 #   - setup-state
 #   - ...
 # Running 5 eval(s) x 10 run(s) = 50 total runs
-# Agent: claude-code, Model: sonnet, Timeout: 300s
+# Agent: claude-code, Model: opus, Timeout: 300s
 # [DRY RUN] Would execute evals here
 ```
 
@@ -246,7 +263,7 @@ Results are saved to `results/<experiment>/<timestamp>/`:
 ```
 results/
   with-mcp/
-    2024-01-27T10-30-00Z/
+    2026-01-27T10-30-00Z/
       experiment.json       # Config and summary
       create-button/
         summary.json        # { totalRuns: 10, passedRuns: 9, passRate: "90%" }
@@ -273,25 +290,42 @@ cat results/with-mcp/*/experiment.json | jq '.evals[] | {name, passRate}'
 
 ## Environment Variables
 
-All agents use **Vercel AI Gateway** for unified billing and observability:
+### Vercel AI Gateway (Recommended)
+
+The default authentication method uses Vercel AI Gateway for unified billing and observability:
 
 ```bash
-# Required: Vercel AI Gateway API key (works for all agents)
+# Required: Vercel AI Gateway API key
 # Get yours at: https://vercel.com/dashboard -> AI Gateway
 AI_GATEWAY_API_KEY=your-ai-gateway-api-key
 
-# Required: Vercel sandbox access
+# Required: Vercel sandbox access (for running agent code)
 # Create at: https://vercel.com/account/tokens
 VERCEL_TOKEN=...
-# OR
-VERCEL_OIDC_TOKEN=...         # For CI/CD pipelines
+# OR (for CI/CD pipelines)
+VERCEL_OIDC_TOKEN=...
 ```
 
-Benefits of AI Gateway:
-- **Single API key** for Claude Code, Codex, and 200+ other models
-- **Unified billing** - one invoice instead of multiple provider accounts
-- **Observability** - request traces and spend tracking in Vercel dashboard
-- **Automatic fallbacks** - resilience when providers have issues
+Benefits:
+- Single API key for Claude Code, Codex, and 200+ other models
+- Unified billing - one invoice instead of multiple provider accounts
+- Observability - request traces and spend tracking in Vercel dashboard
+- Automatic fallbacks - resilience when providers have issues
+
+### Direct API Keys (Alternative)
+
+You can also use provider API keys directly by removing the `vercel-ai-gateway/` prefix:
+
+```bash
+# For agent: 'claude-code'
+ANTHROPIC_API_KEY=sk-ant-...
+
+# For agent: 'codex'
+OPENAI_API_KEY=sk-proj-...
+
+# Still required for sandbox
+VERCEL_TOKEN=...  # or VERCEL_OIDC_TOKEN
+```
 
 ## Tips
 

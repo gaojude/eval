@@ -16,6 +16,7 @@ import {
   captureGeneratedFiles,
   createVitestConfig,
   AI_GATEWAY,
+  ANTHROPIC_DIRECT,
 } from './shared.js';
 
 /**
@@ -49,22 +50,22 @@ async function captureTranscript(sandbox: SandboxManager): Promise<string | unde
 }
 
 /**
- * Claude Code agent implementation.
- * Routes through Vercel AI Gateway for unified billing and observability.
+ * Create Claude Code agent with specified authentication method.
  */
-export const claudeCodeAgent: Agent = {
-  name: 'claude-code',
-  displayName: 'Claude Code',
+export function createClaudeCodeAgent({ useVercelAiGateway }: { useVercelAiGateway: boolean }): Agent {
+  return {
+    name: useVercelAiGateway ? 'vercel-ai-gateway/claude-code' : 'claude-code',
+    displayName: useVercelAiGateway ? 'Claude Code (Vercel AI Gateway)' : 'Claude Code',
 
-  getApiKeyEnvVar(): string {
-    return AI_GATEWAY.apiKeyEnvVar;
-  },
+    getApiKeyEnvVar(): string {
+      return useVercelAiGateway ? AI_GATEWAY.apiKeyEnvVar : ANTHROPIC_DIRECT.apiKeyEnvVar;
+    },
 
-  getDefaultModel(): ModelTier {
-    return 'sonnet';
-  },
+    getDefaultModel(): ModelTier {
+      return 'opus';
+    },
 
-  async run(fixturePath: string, options: AgentRunOptions): Promise<AgentRunResult> {
+    async run(fixturePath: string, options: AgentRunOptions): Promise<AgentRunResult> {
     const startTime = Date.now();
     let sandbox: SandboxManager | null = null;
     let agentOutput = '';
@@ -112,19 +113,22 @@ export const claudeCodeAgent: Agent = {
 
 IMPORTANT: Do not run npm, pnpm, yarn, or any package manager commands. Dependencies have already been installed. Do not run build, test, or dev server commands. Just write the code files.`;
 
-      // Run Claude Code with AI Gateway configuration
-      // Set ANTHROPIC_BASE_URL to route through gateway
-      // Set ANTHROPIC_AUTH_TOKEN for authentication
-      // Set ANTHROPIC_API_KEY to empty to force using AUTH_TOKEN
+      // Run Claude Code with appropriate authentication
       const claudeResult = await sandbox.runCommand(
         'claude',
         ['--print', '--model', options.model, '--dangerously-skip-permissions', enhancedPrompt],
         {
-          env: {
-            ANTHROPIC_BASE_URL: AI_GATEWAY.baseUrl,
-            ANTHROPIC_AUTH_TOKEN: options.apiKey,
-            ANTHROPIC_API_KEY: '',
-          },
+          env: useVercelAiGateway
+            ? {
+                // AI Gateway configuration for Claude Code
+                ANTHROPIC_BASE_URL: AI_GATEWAY.baseUrl,
+                ANTHROPIC_AUTH_TOKEN: options.apiKey,
+                ANTHROPIC_API_KEY: '',
+              }
+            : {
+                // Direct Anthropic API
+                ANTHROPIC_API_KEY: options.apiKey,
+              },
         }
       );
 
@@ -182,3 +186,4 @@ IMPORTANT: Do not run npm, pnpm, yarn, or any package manager commands. Dependen
     }
   },
 };
+}

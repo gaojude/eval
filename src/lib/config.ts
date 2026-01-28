@@ -7,8 +7,6 @@ import type {
   ExperimentConfig,
   ResolvedExperimentConfig,
   EvalFilter,
-  AgentType,
-  ModelTier,
 } from './types.js';
 import { getAgent } from './agents/index.js';
 
@@ -28,7 +26,12 @@ export const CONFIG_DEFAULTS = {
  * Zod schema for validating experiment configuration.
  */
 const experimentConfigSchema = z.object({
-  agent: z.enum(['claude-code', 'codex']),
+  agent: z.enum([
+    'vercel-ai-gateway/claude-code',
+    'claude-code',
+    'vercel-ai-gateway/codex',
+    'codex',
+  ]),
   model: z.string().optional(),
   evals: z
     .union([z.string(), z.array(z.string()), z.function().args(z.string()).returns(z.boolean())])
@@ -58,19 +61,14 @@ export function validateConfig(config: unknown): ExperimentConfig {
 }
 
 /**
- * Get the default model for an agent type.
- */
-export function getDefaultModelForAgent(agentType: AgentType): ModelTier {
-  const agent = getAgent(agentType);
-  return agent.getDefaultModel();
-}
-
-/**
  * Resolves an experiment configuration by applying defaults.
  */
 export function resolveConfig(config: ExperimentConfig): ResolvedExperimentConfig {
+  // Validate agent exists
+  const agent = getAgent(config.agent);
+  
   // Get the default model based on the agent type
-  const defaultModel = config.model ?? getDefaultModelForAgent(config.agent);
+  const defaultModel = config.model ?? agent.getDefaultModel();
 
   return {
     agent: config.agent,

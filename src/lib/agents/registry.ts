@@ -30,8 +30,8 @@ export function getAgent(name: AgentType): Agent {
 /**
  * List all registered agents.
  */
-export function listAgents(): Agent[] {
-  return Array.from(agents.values());
+export function listAgents(): string[] {
+  return Array.from(agents.keys());
 }
 
 /**

@@ -57,13 +57,11 @@ export {
 } from './lib/sandbox.js';
 
 // Re-export agent utilities
-export type { AgentRunOptions, AgentRunResult } from './lib/agent.js';
-export { runAgent } from './lib/agent.js';
+export type { AgentRunOptions, AgentRunResult } from './lib/agents/types.js';
 
-// Re-export agent registry for advanced usage
+// Re-export agent registry
 export type { Agent, ScriptResult } from './lib/agents/types.js';
 export { getAgent, listAgents, registerAgent } from './lib/agents/index.js';
-export { claudeCodeAgent, codexAgent } from './lib/agents/index.js';
 
 // Re-export results utilities
 export type { SaveResultsOptions } from './lib/results.js';

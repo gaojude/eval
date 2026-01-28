@@ -3,7 +3,7 @@
  */
 
 import { mkdirSync, writeFileSync } from 'fs';
-import { join, dirname } from 'path';
+import { join } from 'path';
 import chalk from 'chalk';
 import type {
   EvalRunResult,
@@ -12,7 +12,7 @@ import type {
   ExperimentResults,
   ResolvedExperimentConfig,
 } from './types.js';
-import type { AgentRunResult } from './agent.js';
+import type { AgentRunResult } from './agents/types.js';
 
 /**
  * Convert AgentRunResult to EvalRunData (result + transcript).
@@ -21,15 +21,17 @@ export function agentResultToEvalRunData(agentResult: AgentRunResult): EvalRunDa
   // Collect output content from scripts and tests
   const outputContent: EvalRunData['outputContent'] = {};
 
+  // Add EVAL.ts test output
   if (agentResult.testResult?.output) {
-    outputContent.tests = agentResult.testResult.output;
+    outputContent.eval = agentResult.testResult.output;
   }
 
-  // Add all script outputs
-  if (agentResult.scriptsResults) {
+  // Add all script outputs (nested under 'scripts' to avoid collision)
+  if (agentResult.scriptsResults && Object.keys(agentResult.scriptsResults).length > 0) {
+    outputContent.scripts = {};
     for (const [name, result] of Object.entries(agentResult.scriptsResults)) {
       if (result.output) {
-        outputContent[name] = result.output;
+        outputContent.scripts[name] = result.output;
       }
     }
   }
@@ -103,7 +105,6 @@ export interface SaveResultsOptions {
  *           transcript.jsonl
  *           outputs/
  *         summary.json
- *       experiment.json
  */
 export function saveResults(
   results: ExperimentResults,
@@ -114,12 +115,6 @@ export function saveResults(
 
   // Create experiment directory
   mkdirSync(experimentDir, { recursive: true });
-
-  // Save experiment-level results
-  writeFileSync(
-    join(experimentDir, 'experiment.json'),
-    JSON.stringify(results, null, 2)
-  );
 
   // Save per-eval results
   for (const evalSummary of results.evals) {
@@ -158,17 +153,27 @@ export function saveResults(
       mkdirSync(outputsDir, { recursive: true });
 
       if (runData.outputContent) {
-        const outputPaths: Record<string, string> = {};
+        const outputPaths: EvalRunResult['outputPaths'] = {};
 
-        for (const [name, content] of Object.entries(runData.outputContent)) {
-          if (content) {
-            const fileName = `${name}.txt`;
-            writeFileSync(join(outputsDir, fileName), content);
-            outputPaths[name] = `./outputs/${fileName}`;
+        // Save EVAL.ts test output
+        if (runData.outputContent.eval) {
+          writeFileSync(join(outputsDir, 'eval.txt'), runData.outputContent.eval);
+          outputPaths.eval = './outputs/eval.txt';
+        }
+
+        // Save npm script outputs (nested to avoid collision)
+        if (runData.outputContent.scripts) {
+          outputPaths.scripts = {};
+          for (const [name, content] of Object.entries(runData.outputContent.scripts)) {
+            if (content) {
+              const fileName = `${name}.txt`;
+              writeFileSync(join(outputsDir, fileName), content);
+              outputPaths.scripts[name] = `./outputs/${fileName}`;
+            }
           }
         }
 
-        if (Object.keys(outputPaths).length > 0) {
+        if (outputPaths.eval || (outputPaths.scripts && Object.keys(outputPaths.scripts).length > 0)) {
           resultWithPaths.outputPaths = outputPaths;
         }
       }

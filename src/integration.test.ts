@@ -19,9 +19,12 @@ import { loadConfig } from './lib/config.js';
 dotenvConfig();
 
 const TEST_DIR = '/tmp/eval-framework-integration-test';
-// All agents use AI Gateway API key
-const hasCredentials =
+// AI Gateway credentials
+const hasAiGatewayCredentials =
   process.env.AI_GATEWAY_API_KEY && (process.env.VERCEL_TOKEN || process.env.VERCEL_OIDC_TOKEN);
+// Direct API credentials
+const hasAnthropicCredentials = process.env.ANTHROPIC_API_KEY && (process.env.VERCEL_TOKEN || process.env.VERCEL_OIDC_TOKEN);
+const hasOpenAiCredentials = process.env.OPENAI_API_KEY && (process.env.VERCEL_TOKEN || process.env.VERCEL_OIDC_TOKEN);
 
 describe.skipIf(!process.env.INTEGRATION_TEST)('integration tests', () => {
   beforeAll(() => {
@@ -73,8 +76,8 @@ describe.skipIf(!process.env.INTEGRATION_TEST)('integration tests', () => {
 
       const config = await loadConfig(configPath);
 
-      expect(config.agent).toBe('claude-code');
-      expect(config.model).toBe('sonnet');
+      expect(config.agent).toBe('vercel-ai-gateway/claude-code');
+      expect(config.model).toBe('opus');
     });
 
     it('can load Codex experiment config from generated project', async () => {
@@ -83,12 +86,12 @@ describe.skipIf(!process.env.INTEGRATION_TEST)('integration tests', () => {
 
       const config = await loadConfig(configPath);
 
-      expect(config.agent).toBe('codex');
+      expect(config.agent).toBe('vercel-ai-gateway/codex');
       expect(config.model).toBe('openai/gpt-5.2-codex');
     });
   });
 
-  describe.skipIf(!hasCredentials)('Claude Code sandbox execution', () => {
+  describe.skipIf(!hasAiGatewayCredentials)('Claude Code (Vercel AI Gateway) sandbox execution', () => {
     it('surfaces CLI error when invalid model is provided', async () => {
       // Create a simple test fixture
       const fixtureDir = join(TEST_DIR, 'invalid-model-claude');
@@ -115,7 +118,7 @@ test('dummy', () => expect(true).toBe(true));
       const fixture = loadFixture(TEST_DIR, 'invalid-model-claude');
 
       const result = await runSingleEval(fixture, {
-        agent: 'claude-code',
+        agent: 'vercel-ai-gateway/claude-code',
         model: 'invalid-model-xyz',
         timeout: 60,
         apiKey: process.env.AI_GATEWAY_API_KEY!,
@@ -176,7 +179,7 @@ test('greet exists', () => {
       const fixture = loadFixture(TEST_DIR, 'simple-eval-claude');
 
       const result = await runSingleEval(fixture, {
-        agent: 'claude-code',
+        agent: 'vercel-ai-gateway/claude-code',
         model: 'sonnet',
         timeout: 120,
         apiKey: process.env.AI_GATEWAY_API_KEY!,
@@ -195,7 +198,74 @@ test('greet exists', () => {
     }, 300000); // 5 minute timeout
   });
 
-  describe.skipIf(!hasCredentials)('Codex sandbox execution', () => {
+  describe.skipIf(!hasAnthropicCredentials)('Claude Code (Direct API) sandbox execution', () => {
+    it('can run a simple eval with Claude Code using direct Anthropic API', async () => {
+      // Create a simple test fixture
+      const fixtureDir = join(TEST_DIR, 'simple-eval-claude-direct');
+      mkdirSync(join(fixtureDir, 'src'), { recursive: true });
+
+      writeFileSync(
+        join(fixtureDir, 'PROMPT.md'),
+        'Add a function called greet that returns "Hello from direct API!"'
+      );
+      writeFileSync(
+        join(fixtureDir, 'EVAL.ts'),
+        `
+import { test, expect } from 'vitest';
+import { readFileSync } from 'fs';
+
+test('greet exists', () => {
+  const content = readFileSync('src/index.ts', 'utf-8');
+  expect(content).toContain('greet');
+});
+`
+      );
+      writeFileSync(
+        join(fixtureDir, 'package.json'),
+        JSON.stringify({
+          name: 'simple-eval-claude-direct',
+          type: 'module',
+          scripts: { build: 'tsc' },
+          devDependencies: { typescript: '^5.0.0', vitest: '^2.1.0' },
+        })
+      );
+      writeFileSync(
+        join(fixtureDir, 'tsconfig.json'),
+        JSON.stringify({
+          compilerOptions: {
+            target: 'ES2020',
+            module: 'ESNext',
+            moduleResolution: 'bundler',
+            outDir: 'dist',
+          },
+          include: ['src'],
+        })
+      );
+      writeFileSync(join(fixtureDir, 'src/index.ts'), '// TODO: implement');
+
+      const fixture = loadFixture(TEST_DIR, 'simple-eval-claude-direct');
+
+      const result = await runSingleEval(fixture, {
+        agent: 'claude-code', // Direct API (no ai-gateway/ prefix)
+        model: 'sonnet',
+        timeout: 120,
+        apiKey: process.env.ANTHROPIC_API_KEY!,
+        scripts: ['build'],
+      });
+
+      // Verify result structure
+      expect(result.result.duration).toBeGreaterThan(0);
+      expect(result.result.status).toBeDefined();
+      expect(['passed', 'failed']).toContain(result.result.status);
+
+      // Verify output content exists (if available)
+      if (result.outputContent) {
+        expect(typeof result.outputContent).toBe('object');
+      }
+    }, 300000); // 5 minute timeout
+  });
+
+  describe.skipIf(!hasAiGatewayCredentials)('Codex (Vercel AI Gateway) sandbox execution', () => {
     it('can run a simple eval with Codex', async () => {
       // Create a simple test fixture
       const fixtureDir = join(TEST_DIR, 'simple-eval-codex');
@@ -243,7 +313,7 @@ test('greet exists', () => {
       const fixture = loadFixture(TEST_DIR, 'simple-eval-codex');
 
       const result = await runSingleEval(fixture, {
-        agent: 'codex',
+        agent: 'vercel-ai-gateway/codex',
         model: 'openai/gpt-5.2-codex',
         timeout: 120,
         apiKey: process.env.AI_GATEWAY_API_KEY!,
@@ -316,7 +386,7 @@ test('contains greeting', () => {
       const fixture = loadFixture(TEST_DIR, 'result-structure-codex');
 
       const result = await runSingleEval(fixture, {
-        agent: 'codex',
+        agent: 'vercel-ai-gateway/codex',
         model: 'openai/gpt-5.2-codex',
         timeout: 120,
         apiKey: process.env.AI_GATEWAY_API_KEY!,
@@ -346,13 +416,143 @@ test('contains greeting', () => {
 
       // Verify output content structure if present
       if (result.outputContent) {
-        if (result.outputContent.tests) {
-          expect(typeof result.outputContent.tests).toBe('string');
+        if (result.outputContent.eval) {
+          expect(typeof result.outputContent.eval).toBe('string');
         }
-        if (result.outputContent.build) {
-          expect(typeof result.outputContent.build).toBe('string');
+        if (result.outputContent.scripts?.build) {
+          expect(typeof result.outputContent.scripts.build).toBe('string');
         }
       }
+    }, 300000); // 5 minute timeout
+  });
+
+  describe.skipIf(!hasOpenAiCredentials)('Codex (Direct API) sandbox execution', () => {
+    it('can run a simple eval with Codex using direct OpenAI API', async () => {
+      // Create a simple test fixture
+      const fixtureDir = join(TEST_DIR, 'simple-eval-codex-direct');
+      mkdirSync(join(fixtureDir, 'src'), { recursive: true });
+
+      writeFileSync(
+        join(fixtureDir, 'PROMPT.md'),
+        'Add a function called greet that returns "Hello from OpenAI!"'
+      );
+      writeFileSync(
+        join(fixtureDir, 'EVAL.ts'),
+        `
+import { test, expect } from 'vitest';
+import { readFileSync } from 'fs';
+
+test('greet exists', () => {
+  const content = readFileSync('src/index.ts', 'utf-8');
+  expect(content).toContain('greet');
+});
+`
+      );
+      writeFileSync(
+        join(fixtureDir, 'package.json'),
+        JSON.stringify({
+          name: 'simple-eval-codex-direct',
+          type: 'module',
+          scripts: { build: 'tsc' },
+          devDependencies: { typescript: '^5.0.0', vitest: '^2.1.0' },
+        })
+      );
+      writeFileSync(
+        join(fixtureDir, 'tsconfig.json'),
+        JSON.stringify({
+          compilerOptions: {
+            target: 'ES2020',
+            module: 'ESNext',
+            moduleResolution: 'bundler',
+            outDir: 'dist',
+          },
+          include: ['src'],
+        })
+      );
+      writeFileSync(join(fixtureDir, 'src/index.ts'), '// TODO: implement');
+
+      const fixture = loadFixture(TEST_DIR, 'simple-eval-codex-direct');
+
+      const result = await runSingleEval(fixture, {
+        agent: 'codex', // Direct API (no ai-gateway/ prefix)
+        model: 'openai/gpt-5.2-codex',
+        timeout: 120,
+        apiKey: process.env.OPENAI_API_KEY!,
+        scripts: ['build'],
+      });
+
+      // Verify result structure
+      expect(result.result.duration).toBeGreaterThan(0);
+      expect(result.result.status).toBeDefined();
+      expect(['passed', 'failed']).toContain(result.result.status);
+
+      // Verify output content exists (if available)
+      if (result.outputContent) {
+        expect(typeof result.outputContent).toBe('object');
+      }
+
+      // Verify transcript is captured (if available)
+      if (result.transcript) {
+        expect(typeof result.transcript).toBe('string');
+      }
+    }, 300000); // 5 minute timeout
+
+    it('verifies Codex direct API uses correct configuration', async () => {
+      // Create a simple test fixture
+      const fixtureDir = join(TEST_DIR, 'codex-direct-config-test');
+      mkdirSync(join(fixtureDir, 'src'), { recursive: true });
+
+      writeFileSync(
+        join(fixtureDir, 'PROMPT.md'),
+        'Create a hello.ts file that exports a greeting constant.'
+      );
+      writeFileSync(
+        join(fixtureDir, 'EVAL.ts'),
+        `
+import { test, expect } from 'vitest';
+import { readFileSync, existsSync } from 'fs';
+
+test('hello.ts exists', () => {
+  expect(existsSync('src/hello.ts')).toBe(true);
+});
+`
+      );
+      writeFileSync(
+        join(fixtureDir, 'package.json'),
+        JSON.stringify({
+          name: 'codex-direct-config-test',
+          type: 'module',
+          scripts: { build: 'tsc' },
+          devDependencies: { typescript: '^5.0.0', vitest: '^2.1.0' },
+        })
+      );
+      writeFileSync(
+        join(fixtureDir, 'tsconfig.json'),
+        JSON.stringify({
+          compilerOptions: {
+            target: 'ES2020',
+            module: 'ESNext',
+            moduleResolution: 'bundler',
+            outDir: 'dist',
+          },
+          include: ['src'],
+        })
+      );
+
+      const fixture = loadFixture(TEST_DIR, 'codex-direct-config-test');
+
+      const result = await runSingleEval(fixture, {
+        agent: 'codex', // Direct API
+        model: 'openai/gpt-5.2-codex',
+        timeout: 120,
+        apiKey: process.env.OPENAI_API_KEY!,
+        scripts: ['build'],
+      });
+
+      // Verify EvalRunData structure
+      expect(result).toHaveProperty('result');
+      expect(result.result).toHaveProperty('status');
+      expect(result.result).toHaveProperty('duration');
     }, 300000); // 5 minute timeout
   });
 
@@ -367,7 +567,7 @@ test('contains greeting', () => {
 
       expect(result).toContain('DRY RUN');
       expect(result).toContain('add-greeting');
-      expect(result).toContain('Agent: claude-code');
+      expect(result).toContain('Agent: vercel-ai-gateway/claude-code');
     });
 
     it('can dry run Codex experiment via CLI', () => {
@@ -380,7 +580,7 @@ test('contains greeting', () => {
 
       expect(result).toContain('DRY RUN');
       expect(result).toContain('add-greeting');
-      expect(result).toContain('Agent: codex');
+      expect(result).toContain('Agent: vercel-ai-gateway/codex');
       expect(result).toContain('Model: openai/gpt-5.2-codex');
     });
   });

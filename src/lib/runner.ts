@@ -122,8 +122,7 @@ export async function runSingleEval(
     verbose?: boolean;
   }
 ): Promise<EvalRunData> {
-  // Default to claude-code for backwards compatibility
-  const agent = getAgent(options.agent ?? 'claude-code');
+  const agent = getAgent(options.agent ?? 'vercel-ai-gateway/claude-code');
 
   const agentResult = await agent.run(fixture.path, {
     prompt: fixture.prompt,

@@ -16,6 +16,7 @@ import {
   captureGeneratedFiles,
   createVitestConfig,
   AI_GATEWAY,
+  OPENAI_DIRECT,
 } from './shared.js';
 
 /**
@@ -42,13 +43,13 @@ function extractTranscriptFromOutput(output: string): string | undefined {
 }
 
 /**
- * Generate Codex config.toml content for AI Gateway.
+ * Generate Codex config.toml content.
  */
-function generateCodexConfig(model: string): string {
-  // Ensure model has provider prefix for AI Gateway
+function generateCodexConfig(model: string, useVercelAiGateway: boolean): string {
   const fullModel = model.includes('/') ? model : `openai/${model}`;
 
-  return `# Codex configuration for Vercel AI Gateway
+  if (useVercelAiGateway) {
+    return `# Codex configuration for Vercel AI Gateway
 profile = "default"
 
 [model_providers.vercel]
@@ -61,25 +62,40 @@ wire_api = "chat"
 model_provider = "vercel"
 model = "${fullModel}"
 `;
+  } else {
+    return `# Direct OpenAI API configuration
+profile = "default"
+
+[model_providers.openai]
+name = "OpenAI"
+base_url = "${OPENAI_DIRECT.baseUrl}"
+env_key = "${OPENAI_DIRECT.apiKeyEnvVar}"
+wire_api = "chat"
+
+[profiles.default]
+model_provider = "openai"
+model = "${fullModel}"
+`;
+  }
 }
 
 /**
- * OpenAI Codex CLI agent implementation.
- * Routes through Vercel AI Gateway for unified billing and observability.
+ * Create Codex agent with specified authentication method.
  */
-export const codexAgent: Agent = {
-  name: 'codex',
-  displayName: 'OpenAI Codex',
+export function createCodexAgent({ useVercelAiGateway }: { useVercelAiGateway: boolean }): Agent {
+  return {
+    name: useVercelAiGateway ? 'vercel-ai-gateway/codex' : 'codex',
+    displayName: useVercelAiGateway ? 'OpenAI Codex (Vercel AI Gateway)' : 'OpenAI Codex',
 
-  getApiKeyEnvVar(): string {
-    return AI_GATEWAY.apiKeyEnvVar;
-  },
+    getApiKeyEnvVar(): string {
+      return useVercelAiGateway ? AI_GATEWAY.apiKeyEnvVar : OPENAI_DIRECT.apiKeyEnvVar;
+    },
 
-  getDefaultModel(): ModelTier {
-    return 'openai/gpt-5.2-codex';
-  },
+    getDefaultModel(): ModelTier {
+      return 'openai/gpt-5.2-codex';
+    },
 
-  async run(fixturePath: string, options: AgentRunOptions): Promise<AgentRunResult> {
+    async run(fixturePath: string, options: AgentRunOptions): Promise<AgentRunResult> {
     const startTime = Date.now();
     let sandbox: SandboxManager | null = null;
     let agentOutput = '';
@@ -119,9 +135,9 @@ export const codexAgent: Agent = {
         throw new Error(`Codex CLI install failed: ${cliInstall.stderr}`);
       }
 
-      // Create Codex config directory and config file for AI Gateway
+      // Create Codex config directory and config file
       await sandbox.runShell('mkdir -p ~/.codex');
-      const configContent = generateCodexConfig(options.model);
+      const configContent = generateCodexConfig(options.model, useVercelAiGateway);
       await sandbox.runShell(`cat > ~/.codex/config.toml << 'EOF'
 ${configContent}
 EOF`);
@@ -148,9 +164,13 @@ IMPORTANT: Do not run npm, pnpm, yarn, or any package manager commands. Dependen
           enhancedPrompt,
         ],
         {
-          env: {
-            [AI_GATEWAY.apiKeyEnvVar]: options.apiKey,
-          },
+          env: useVercelAiGateway
+            ? {
+                [AI_GATEWAY.apiKeyEnvVar]: options.apiKey,
+              }
+            : {
+                [OPENAI_DIRECT.apiKeyEnvVar]: options.apiKey,
+              },
         }
       );
 
@@ -208,3 +228,4 @@ IMPORTANT: Do not run npm, pnpm, yarn, or any package manager commands. Dependen
     }
   },
 };
+}

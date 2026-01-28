@@ -5,7 +5,11 @@
 /**
  * Supported AI agent types.
  */
-export type AgentType = 'claude-code' | 'codex';
+export type AgentType =
+  | 'vercel-ai-gateway/claude-code'
+  | 'claude-code'
+  | 'vercel-ai-gateway/codex'
+  | 'codex';
 
 /**
  * Model identifier - any string accepted.
@@ -51,7 +55,7 @@ export interface ExperimentConfig {
   /** Which AI agent to use */
   agent: AgentType;
 
-  /** Which AI model the agent should use. @default 'opus' */
+  /** Which AI model the agent should use. Default is agent-specific: 'opus' for claude-code, 'openai/gpt-5.2-codex' for codex */
   model?: ModelTier;
 
   /** Which evals to run. Can be a string, array, or filter function. @default '*' (all evals) */
@@ -125,8 +129,10 @@ export interface EvalRunResult {
   transcriptPath?: string;
   /** Paths to output files (relative to run directory) */
   outputPaths?: {
-    tests?: string;
-    [scriptName: string]: string | undefined;
+    /** Path to EVAL.ts test output */
+    eval?: string;
+    /** Paths to npm script outputs (nested to avoid collision) */
+    scripts?: Record<string, string>;
   };
 }
 
@@ -140,8 +146,10 @@ export interface EvalRunData {
   transcript?: string;
   /** Script/test output content (saved to outputs/) */
   outputContent?: {
-    tests?: string;
-    [scriptName: string]: string | undefined;
+    /** EVAL.ts test output */
+    eval?: string;
+    /** npm script outputs (nested to avoid collision) */
+    scripts?: Record<string, string>;
   };
 }
 

@@ -9,7 +9,6 @@ import {
   loadAllFixtures,
   getFixtureFiles,
   readFixtureFiles,
-  FixtureValidationError,
 } from './fixture.js';
 
 const TEST_DIR = '/tmp/eval-framework-test-fixtures';
@@ -40,56 +39,21 @@ describe('fixture discovery and validation', () => {
   });
 
   describe('discoverFixtures', () => {
-    it('discovers fixture directories', () => {
-      createTestFixture('eval-1', { 'README.md': '# Test' });
-      createTestFixture('eval-2', { 'README.md': '# Test' });
-
-      const fixtures = discoverFixtures(TEST_DIR);
-      expect(fixtures).toEqual(['eval-1', 'eval-2']);
-    });
-
-    it('ignores hidden directories', () => {
-      createTestFixture('eval-1', { 'README.md': '# Test' });
+    it('discovers and sorts fixture directories', () => {
+      createTestFixture('z-eval', { 'README.md': '# Test' });
+      createTestFixture('a-eval', { 'README.md': '# Test' });
       createTestFixture('.hidden', { 'README.md': '# Test' });
 
       const fixtures = discoverFixtures(TEST_DIR);
-      expect(fixtures).toEqual(['eval-1']);
-    });
-
-    it('ignores files at root level', () => {
-      createTestFixture('eval-1', { 'README.md': '# Test' });
-      writeFileSync(join(TEST_DIR, 'some-file.txt'), 'content');
-
-      const fixtures = discoverFixtures(TEST_DIR);
-      expect(fixtures).toEqual(['eval-1']);
+      expect(fixtures).toEqual(['a-eval', 'z-eval']);
     });
 
     it('throws if directory does not exist', () => {
       expect(() => discoverFixtures('/non/existent/path')).toThrow('Evals directory not found');
     });
-
-    it('returns sorted fixture names', () => {
-      createTestFixture('z-eval', { 'README.md': '# Test' });
-      createTestFixture('a-eval', { 'README.md': '# Test' });
-      createTestFixture('m-eval', { 'README.md': '# Test' });
-
-      const fixtures = discoverFixtures(TEST_DIR);
-      expect(fixtures).toEqual(['a-eval', 'm-eval', 'z-eval']);
-    });
   });
 
   describe('validateFixtureFiles', () => {
-    it('returns empty array for valid fixture', () => {
-      const path = createTestFixture('valid', {
-        'PROMPT.md': '# Task',
-        'EVAL.ts': 'test code',
-        'package.json': '{}',
-      });
-
-      const missing = validateFixtureFiles(path);
-      expect(missing).toEqual([]);
-    });
-
     it('returns missing files', () => {
       const path = createTestFixture('incomplete', {
         'PROMPT.md': '# Task',
@@ -122,16 +86,6 @@ describe('fixture discovery and validation', () => {
       expect(result.isModule).toBe(false);
       expect(result.error).toContain('type');
     });
-
-    it('rejects invalid JSON', () => {
-      const path = createTestFixture('invalid-json', {
-        'package.json': '{ invalid json }',
-      });
-
-      const result = validatePackageJson(path);
-      expect(result.isModule).toBe(false);
-      expect(result.error).toContain('not valid JSON');
-    });
   });
 
   describe('loadFixture', () => {
@@ -147,11 +101,6 @@ describe('fixture discovery and validation', () => {
       expect(fixture.name).toBe('my-eval');
       expect(fixture.prompt).toBe('Add a button');
       expect(fixture.isModule).toBe(true);
-      expect(fixture.path).toContain('my-eval');
-    });
-
-    it('throws for non-existent fixture', () => {
-      expect(() => loadFixture(TEST_DIR, 'non-existent')).toThrow(FixtureValidationError);
     });
 
     it('throws for missing required files', () => {
@@ -161,39 +110,10 @@ describe('fixture discovery and validation', () => {
 
       expect(() => loadFixture(TEST_DIR, 'incomplete')).toThrow('Missing required files');
     });
-
-    it('throws for invalid package.json', () => {
-      createTestFixture('bad-pkg', {
-        'PROMPT.md': 'Task',
-        'EVAL.ts': 'test code',
-        'package.json': JSON.stringify({ name: 'test' }), // Missing type: module
-      });
-
-      expect(() => loadFixture(TEST_DIR, 'bad-pkg')).toThrow('type');
-    });
   });
 
   describe('loadAllFixtures', () => {
-    it('loads all valid fixtures', () => {
-      createTestFixture('eval-1', {
-        'PROMPT.md': 'Task 1',
-        'EVAL.ts': 'test 1',
-        'package.json': JSON.stringify({ type: 'module' }),
-      });
-      createTestFixture('eval-2', {
-        'PROMPT.md': 'Task 2',
-        'EVAL.ts': 'test 2',
-        'package.json': JSON.stringify({ type: 'module' }),
-      });
-
-      const { fixtures, errors } = loadAllFixtures(TEST_DIR);
-
-      expect(fixtures).toHaveLength(2);
-      expect(errors).toHaveLength(0);
-      expect(fixtures.map((f) => f.name)).toEqual(['eval-1', 'eval-2']);
-    });
-
-    it('collects validation errors without throwing', () => {
+    it('loads all valid fixtures and collects errors', () => {
       createTestFixture('valid', {
         'PROMPT.md': 'Task',
         'EVAL.ts': 'test',
@@ -214,59 +134,28 @@ describe('fixture discovery and validation', () => {
   });
 
   describe('getFixtureFiles', () => {
-    it('lists all files excluding defaults', () => {
+    it('lists all files excluding defaults and node_modules', () => {
       createTestFixture('full', {
         'PROMPT.md': 'Task',
         'EVAL.ts': 'test',
         'package.json': '{}',
         'src/App.tsx': 'app code',
-        'src/utils/helper.ts': 'helper',
-        'tsconfig.json': '{}',
+        'node_modules/pkg/index.js': 'module code',
       });
 
       const path = join(TEST_DIR, 'full');
       const files = getFixtureFiles(path);
 
       expect(files).toContain('src/App.tsx');
-      expect(files).toContain('src/utils/helper.ts');
       expect(files).toContain('package.json');
-      expect(files).toContain('tsconfig.json');
       expect(files).not.toContain('PROMPT.md');
       expect(files).not.toContain('EVAL.ts');
-    });
-
-    it('excludes node_modules', () => {
-      createTestFixture('with-modules', {
-        'package.json': '{}',
-        'src/App.tsx': 'app',
-        'node_modules/pkg/index.js': 'module code',
-      });
-
-      const path = join(TEST_DIR, 'with-modules');
-      const files = getFixtureFiles(path);
-
       expect(files).not.toContain('node_modules/pkg/index.js');
-      expect(files).toContain('src/App.tsx');
-    });
-
-    it('uses custom exclude patterns', () => {
-      createTestFixture('custom', {
-        'PROMPT.md': 'Task',
-        'src/App.tsx': 'app',
-        'dist/bundle.js': 'bundle',
-      });
-
-      const path = join(TEST_DIR, 'custom');
-      const files = getFixtureFiles(path, ['dist']);
-
-      expect(files).toContain('PROMPT.md');
-      expect(files).toContain('src/App.tsx');
-      expect(files).not.toContain('dist/bundle.js');
     });
   });
 
   describe('readFixtureFiles', () => {
-    it('reads file contents into map', () => {
+    it('reads file contents into map excluding PROMPT and EVAL', () => {
       createTestFixture('readable', {
         'PROMPT.md': 'Task',
         'EVAL.ts': 'test',

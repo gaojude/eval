@@ -47,8 +47,8 @@ describe('init utilities', () => {
       expect(existsSync(configPath)).toBe(true);
 
       const content = readFileSync(configPath, 'utf-8');
-      expect(content).toContain("agent: 'claude-code'");
-      expect(content).toContain("model: 'sonnet'");
+      expect(content).toContain("agent: 'vercel-ai-gateway/claude-code'");
+      expect(content).toContain("// model: 'opus',  // Uncomment to override default");
     });
 
     it('creates example eval fixture', () => {

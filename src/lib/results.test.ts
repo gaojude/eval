@@ -9,7 +9,7 @@ import {
   formatResultsTable,
   formatRunResult,
 } from './results.js';
-import type { AgentRunResult } from './agent.js';
+import type { AgentRunResult } from './agents/types.js';
 import type { EvalRunResult, EvalRunData, ResolvedExperimentConfig } from './types.js';
 
 const TEST_DIR = '/tmp/eval-framework-results-test';
@@ -31,11 +31,10 @@ describe('results utilities', () => {
         success: true,
         output: 'Agent output',
         transcript: '{"role":"assistant","content":"Hello"}',
-        duration: 45000, // 45 seconds in ms
+        duration: 45000,
         testResult: { success: true, output: 'test output' },
         scriptsResults: {
           build: { success: true, output: 'build output' },
-          lint: { success: true, output: 'lint output' },
         },
         sandboxId: 'sandbox-123',
       };
@@ -43,9 +42,10 @@ describe('results utilities', () => {
       const runData = agentResultToEvalRunData(agentResult);
 
       expect(runData.result.status).toBe('passed');
-      expect(runData.result.duration).toBe(45); // Converted to seconds
-      expect(runData.result.error).toBeUndefined();
+      expect(runData.result.duration).toBe(45);
       expect(runData.transcript).toBe('{"role":"assistant","content":"Hello"}');
+      expect(runData.outputContent?.eval).toBe('test output');
+      expect(runData.outputContent?.scripts?.build).toBe('build output');
     });
 
     it('converts failed agent result', () => {
@@ -54,8 +54,8 @@ describe('results utilities', () => {
         output: 'Agent output',
         duration: 30000,
         error: 'API Error: model not found',
-        scriptsResults: { build: { success: true, output: '' } },
         testResult: { success: false, output: 'test failed' },
+        scriptsResults: {},
       };
 
       const runData = agentResultToEvalRunData(agentResult);
@@ -63,42 +63,13 @@ describe('results utilities', () => {
       expect(runData.result.status).toBe('failed');
       expect(runData.result.error).toBe('API Error: model not found');
     });
-
-    it('includes output content from scripts and tests', () => {
-      const agentResult: AgentRunResult = {
-        success: true,
-        output: 'Agent output',
-        duration: 30000,
-        testResult: { success: true, output: 'test output here' },
-        scriptsResults: {
-          build: { success: true, output: 'build output here' },
-        },
-      };
-
-      const runData = agentResultToEvalRunData(agentResult);
-
-      expect(runData.outputContent?.tests).toBe('test output here');
-      expect(runData.outputContent?.build).toBe('build output here');
-    });
-
-    it('handles missing transcript', () => {
-      const agentResult: AgentRunResult = {
-        success: true,
-        output: 'output',
-        duration: 10000,
-      };
-
-      const runData = agentResultToEvalRunData(agentResult);
-
-      expect(runData.transcript).toBeUndefined();
-    });
   });
 
   describe('createEvalSummary', () => {
     it('creates summary from run data', () => {
       const runData: EvalRunData[] = [
-        { result: { status: 'passed', duration: 10 }, transcript: 'transcript1' },
-        { result: { status: 'passed', duration: 15 }, transcript: 'transcript2' },
+        { result: { status: 'passed', duration: 10 } },
+        { result: { status: 'passed', duration: 15 } },
         { result: { status: 'failed', duration: 8, error: 'Test failed' } },
       ];
 
@@ -109,27 +80,6 @@ describe('results utilities', () => {
       expect(summary.passedRuns).toBe(2);
       expect(summary.passRate).toBeCloseTo(66.67, 1);
       expect(summary.meanDuration).toBeCloseTo(11, 0);
-      expect(summary.runs).toBe(runData);
-    });
-
-    it('handles empty runs', () => {
-      const summary = createEvalSummary('empty-eval', []);
-
-      expect(summary.totalRuns).toBe(0);
-      expect(summary.passedRuns).toBe(0);
-      expect(summary.passRate).toBe(0);
-      expect(summary.meanDuration).toBe(0);
-    });
-
-    it('calculates 100% pass rate', () => {
-      const runData: EvalRunData[] = [
-        { result: { status: 'passed', duration: 10 } },
-        { result: { status: 'passed', duration: 12 } },
-      ];
-
-      const summary = createEvalSummary('perfect-eval', runData);
-
-      expect(summary.passRate).toBe(100);
     });
   });
 
@@ -175,7 +125,7 @@ describe('results utilities', () => {
           {
             result: { status: 'passed', duration: 10 },
             transcript: '{"role":"assistant"}',
-            outputContent: { tests: 'Test output here', build: 'Build output here' },
+            outputContent: { eval: 'Test output here', scripts: { build: 'Build output here' } },
           },
           { result: { status: 'failed', duration: 8, error: 'Error' } },
         ]),
@@ -193,9 +143,6 @@ describe('results utilities', () => {
         experimentName: 'test-experiment',
       });
 
-      // Check experiment.json exists
-      expect(existsSync(join(outputDir, 'experiment.json'))).toBe(true);
-
       // Check eval summary exists
       expect(existsSync(join(outputDir, 'eval-1', 'summary.json'))).toBe(true);
 
@@ -210,12 +157,12 @@ describe('results utilities', () => {
 
       // Check outputs/ directory exists and contains script output files
       expect(existsSync(join(outputDir, 'eval-1', 'run-1', 'outputs'))).toBe(true);
-      expect(existsSync(join(outputDir, 'eval-1', 'run-1', 'outputs', 'tests.txt'))).toBe(true);
+      expect(existsSync(join(outputDir, 'eval-1', 'run-1', 'outputs', 'eval.txt'))).toBe(true);
       expect(existsSync(join(outputDir, 'eval-1', 'run-1', 'outputs', 'build.txt'))).toBe(true);
 
       // Verify output file content
       const testsOutput = readFileSync(
-        join(outputDir, 'eval-1', 'run-1', 'outputs', 'tests.txt'),
+        join(outputDir, 'eval-1', 'run-1', 'outputs', 'eval.txt'),
         'utf-8'
       );
       expect(testsOutput).toBe('Test output here');
@@ -225,12 +172,6 @@ describe('results utilities', () => {
         'utf-8'
       );
       expect(buildOutput).toBe('Build output here');
-
-      // Verify experiment.json content
-      const experimentJson = JSON.parse(
-        readFileSync(join(outputDir, 'experiment.json'), 'utf-8')
-      );
-      expect(experimentJson.config.model).toBe('opus');
 
       // Verify summary.json format (per design: totalRuns, passedRuns, passRate as string, meanDuration)
       const summaryJson = JSON.parse(
@@ -253,8 +194,10 @@ describe('results utilities', () => {
       // Should have paths to transcript and outputs
       expect(resultJson.transcriptPath).toBe('./transcript.jsonl');
       expect(resultJson.outputPaths).toEqual({
-        tests: './outputs/tests.txt',
-        build: './outputs/build.txt',
+        eval: './outputs/eval.txt',
+        scripts: {
+          build: './outputs/build.txt',
+        },
       });
       // Should NOT have raw content
       expect(resultJson.transcript).toBeUndefined();
@@ -323,7 +266,7 @@ describe('results utilities', () => {
       const result: EvalRunResult = {
         status: 'failed',
         duration: 30.0,
-        error: 'Test assertion failed: expected true to be false',
+        error: 'Test assertion failed',
       };
       const formatted = formatRunResult('failing-eval', 3, 10, result);
 

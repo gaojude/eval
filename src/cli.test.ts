@@ -20,11 +20,12 @@ function runCli(args: string[], cwd?: string): { stdout: string; stderr: string;
       stdio: ['pipe', 'pipe', 'pipe'],
     });
     return { stdout, stderr: '', exitCode: 0 };
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const e = error as { stdout?: Buffer; stderr?: Buffer; status?: number };
     return {
-      stdout: error.stdout?.toString() ?? '',
-      stderr: error.stderr?.toString() ?? '',
-      exitCode: error.status ?? 1,
+      stdout: e.stdout?.toString() ?? '',
+      stderr: e.stderr?.toString() ?? '',
+      exitCode: e.status ?? 1,
     };
   }
 }
@@ -119,7 +120,7 @@ describe('CLI', () => {
       mkdirSync(evalsDir);
 
       const result = runCli(['run', 'experiments/default.ts'], projectDir);
-      expect(result.stderr).toContain('Error');
+      expect(result.stderr.toLowerCase()).toContain('error');
       expect(result.exitCode).toBe(1);
     });
   });

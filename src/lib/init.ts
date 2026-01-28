@@ -88,10 +88,13 @@ function getDefaultExperiment(): string {
 
 const config: ExperimentConfig = {
   // Which AI agent to use: 'claude-code' or 'codex'
-  agent: 'claude-code',
+  // Add 'vercel-ai-gateway/' prefix to use Vercel AI Gateway
+  agent: 'vercel-ai-gateway/claude-code',
 
-  // Which model to use (e.g., 'sonnet', 'haiku', 'opus', or any model ID)
-  model: 'sonnet',
+  // Which model to use (defaults to 'opus' for claude-code, 'openai/gpt-5.2-codex' for codex)
+  // Options for claude-code: 'opus', 'sonnet', 'haiku', or any Anthropic model ID
+  // Options for codex: 'openai/gpt-5.2-codex', 'openai/o3', or any OpenAI model ID
+  // model: 'opus',  // Uncomment to override default
 
   // How many times to run each eval (for measuring reliability)
   runs: 1,
@@ -118,10 +121,12 @@ function getCodexExperiment(): string {
 
 const config: ExperimentConfig = {
   // Which AI agent to use: 'claude-code' or 'codex'
-  agent: 'codex',
+  // Add 'vercel-ai-gateway/' prefix to use Vercel AI Gateway
+  agent: 'vercel-ai-gateway/codex',
 
-  // Which model to use (e.g., 'openai/gpt-5.2-codex', 'openai/o3', or any model ID)
-  model: 'openai/gpt-5.2-codex',
+  // Which model to use (defaults to 'openai/gpt-5.2-codex' for codex)
+  // Options: 'openai/gpt-5.2-codex', 'openai/o3', or any OpenAI model ID
+  // model: 'openai/gpt-5.2-codex',  // Uncomment to override default
 
   // How many times to run each eval (for measuring reliability)
   runs: 1,
