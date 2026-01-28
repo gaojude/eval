@@ -69,11 +69,42 @@ export function createClaudeCodeAgent({ useVercelAiGateway }: { useVercelAiGatew
     const startTime = Date.now();
     let sandbox: SandboxManager | null = null;
     let agentOutput = '';
+    let aborted = false;
+
+    // Handle abort signal
+    const abortHandler = () => {
+      aborted = true;
+      if (sandbox) {
+        sandbox.stop().catch(() => {});
+      }
+    };
+
+    if (options.signal) {
+      if (options.signal.aborted) {
+        return {
+          success: false,
+          output: '',
+          error: 'Aborted before start',
+          duration: 0,
+        };
+      }
+      options.signal.addEventListener('abort', abortHandler);
+    }
 
     try {
       // Collect files from fixture
       const allFiles = await collectLocalFiles(fixturePath);
       const { workspaceFiles, testFiles } = splitTestFiles(allFiles);
+
+      // Check for abort before expensive operations
+      if (aborted) {
+        return {
+          success: false,
+          output: '',
+          error: 'Aborted',
+          duration: Date.now() - startTime,
+        };
+      }
 
       // Create sandbox
       sandbox = await SandboxManager.create({
@@ -172,6 +203,16 @@ IMPORTANT: Do not run npm, pnpm, yarn, or any package manager commands. Dependen
         generatedFiles,
       };
     } catch (error) {
+      // Check if this was an abort
+      if (aborted) {
+        return {
+          success: false,
+          output: agentOutput,
+          error: 'Aborted',
+          duration: Date.now() - startTime,
+          sandboxId: sandbox?.sandboxId,
+        };
+      }
       return {
         success: false,
         output: agentOutput,
@@ -180,6 +221,10 @@ IMPORTANT: Do not run npm, pnpm, yarn, or any package manager commands. Dependen
         sandboxId: sandbox?.sandboxId,
       };
     } finally {
+      // Clean up abort listener
+      if (options.signal) {
+        options.signal.removeEventListener('abort', abortHandler);
+      }
       if (sandbox) {
         await sandbox.stop();
       }

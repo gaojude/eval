@@ -1,6 +1,6 @@
 {
   "name": "@judegao/eval",
-  "version": "1.1.1",
+  "version": "1.2.0",
   "description": "Framework for testing AI coding agents in isolated sandboxes",
   "type": "module",
   "main": "dist/index.js",

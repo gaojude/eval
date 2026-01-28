@@ -19,24 +19,117 @@ describe('runExperiment', () => {
     vi.restoreAllMocks();
   });
 
-  describe('early exit behavior', () => {
-    it('stops after first successful run when earlyExit is true', async () => {
-      // Create a mock agent that always succeeds
+  describe('concurrent execution', () => {
+    it('runs all attempts concurrently', async () => {
+      const startTimes: number[] = [];
+      const endTimes: number[] = [];
+
       const mockAgent: Agent = {
         name: 'mock-agent',
         displayName: 'Mock Agent',
         getApiKeyEnvVar: () => 'MOCK_API_KEY',
         getDefaultModel: () => 'mock-model',
-        run: vi.fn().mockResolvedValue({
-          success: true,
-          output: 'Agent output',
-          duration: 1000,
-          testResult: { success: true, output: 'Test passed' },
-          scriptsResults: {},
+        run: vi.fn().mockImplementation(async () => {
+          startTimes.push(Date.now());
+          // Simulate some work
+          await new Promise((resolve) => setTimeout(resolve, 50));
+          endTimes.push(Date.now());
+          return {
+            success: true,
+            output: 'Agent output',
+            duration: 50,
+            testResult: { success: true, output: 'Test passed' },
+            scriptsResults: {},
+          };
         }),
       };
 
-      // Spy on getAgent to return our mock
+      vi.spyOn(agentsIndex, 'getAgent').mockReturnValue(mockAgent);
+
+      const config: ResolvedExperimentConfig = {
+        agent: 'claude-code',
+        model: 'sonnet',
+        evals: ['eval-1', 'eval-2'],
+        runs: 3,
+        earlyExit: false,
+        scripts: [],
+        timeout: 300,
+      };
+
+      const fixtures: EvalFixture[] = [
+        { name: 'eval-1', path: '/fake/path/eval-1', prompt: 'Test 1', isModule: true },
+        { name: 'eval-2', path: '/fake/path/eval-2', prompt: 'Test 2', isModule: true },
+      ];
+
+      await runExperiment({
+        config,
+        fixtures,
+        apiKey: 'test-key',
+        resultsDir: TEST_DIR,
+        experimentName: 'test-experiment',
+      });
+
+      // All 6 attempts should have been called
+      expect(mockAgent.run).toHaveBeenCalledTimes(6);
+
+      // Verify concurrent execution: all starts should happen before all ends
+      // (in sequential execution, start[i+1] would be after end[i])
+      const maxStart = Math.max(...startTimes);
+      const minEnd = Math.min(...endTimes);
+
+      // If concurrent, some tasks should still be starting while others finish
+      // The max start time should be close to the min start time (all started together)
+      const startSpread = maxStart - Math.min(...startTimes);
+      expect(startSpread).toBeLessThan(30); // All should start within 30ms of each other
+    });
+  });
+
+  describe('early exit behavior', () => {
+    it('aborts remaining attempts when one passes with earlyExit', async () => {
+      const abortedSignals: boolean[] = [];
+
+      const mockAgent: Agent = {
+        name: 'mock-agent',
+        displayName: 'Mock Agent',
+        getApiKeyEnvVar: () => 'MOCK_API_KEY',
+        getDefaultModel: () => 'mock-model',
+        run: vi.fn().mockImplementation(async (_fixturePath: string, options: { signal?: AbortSignal }) => {
+          // Track if signal was aborted
+          abortedSignals.push(options.signal?.aborted ?? false);
+
+          // If already aborted, return aborted result
+          if (options.signal?.aborted) {
+            return {
+              success: false,
+              output: '',
+              error: 'Aborted',
+              duration: 0,
+            };
+          }
+
+          // Simulate some work - first completion wins
+          await new Promise((resolve) => setTimeout(resolve, 10));
+
+          // Check if aborted during work
+          if (options.signal?.aborted) {
+            return {
+              success: false,
+              output: '',
+              error: 'Aborted',
+              duration: 10,
+            };
+          }
+
+          return {
+            success: true,
+            output: 'Agent output',
+            duration: 10,
+            testResult: { success: true, output: 'Test passed' },
+            scriptsResults: {},
+          };
+        }),
+      };
+
       vi.spyOn(agentsIndex, 'getAgent').mockReturnValue(mockAgent);
 
       const config: ResolvedExperimentConfig = {
@@ -66,14 +159,12 @@ describe('runExperiment', () => {
         experimentName: 'test-experiment',
       });
 
-      // Should only run once since first run passed
-      expect(mockAgent.run).toHaveBeenCalledTimes(1);
+      // With earlyExit, only non-aborted passing runs should be counted
       expect(results.evals[0].totalRuns).toBe(1);
       expect(results.evals[0].passedRuns).toBe(1);
     });
 
-    it('continues running when earlyExit is true but runs fail', async () => {
-      // Create a mock agent that always fails
+    it('runs all attempts when earlyExit is true but all runs fail', async () => {
       const mockAgent: Agent = {
         name: 'mock-agent',
         displayName: 'Mock Agent',
@@ -118,14 +209,13 @@ describe('runExperiment', () => {
         experimentName: 'test-experiment',
       });
 
-      // Should run all 3 times since all runs failed
+      // All 3 attempts should have run since none passed
       expect(mockAgent.run).toHaveBeenCalledTimes(3);
       expect(results.evals[0].totalRuns).toBe(3);
       expect(results.evals[0].passedRuns).toBe(0);
     });
 
     it('runs all configured runs when earlyExit is false', async () => {
-      // Create a mock agent that always succeeds
       const mockAgent: Agent = {
         name: 'mock-agent',
         displayName: 'Mock Agent',
@@ -169,31 +259,62 @@ describe('runExperiment', () => {
         experimentName: 'test-experiment',
       });
 
-      // Should run all 4 times even though all runs passed
+      // All 4 runs should be counted when earlyExit is false
       expect(mockAgent.run).toHaveBeenCalledTimes(4);
       expect(results.evals[0].totalRuns).toBe(4);
       expect(results.evals[0].passedRuns).toBe(4);
     });
 
-    it('exits early on second run when first fails but second passes', async () => {
-      let callCount = 0;
-      
-      // Create a mock agent that fails first, then succeeds
+    it('aborts in-flight runs when one passes', async () => {
+      const abortEvents: string[] = []; // Track when abort events fire
+      let completedCount = 0;
+
       const mockAgent: Agent = {
         name: 'mock-agent',
         displayName: 'Mock Agent',
         getApiKeyEnvVar: () => 'MOCK_API_KEY',
         getDefaultModel: () => 'mock-model',
-        run: vi.fn().mockImplementation(async () => {
-          callCount++;
-          const success = callCount > 1; // Fail first, succeed after
-          
+        run: vi.fn().mockImplementation(async (_fixturePath: string, options: { signal?: AbortSignal }) => {
+          const runId = completedCount;
+          completedCount++;
+
+          // Listen for abort event (this is what real agents do)
+          if (options.signal) {
+            options.signal.addEventListener('abort', () => {
+              abortEvents.push(`run-${runId}-aborted-at-${Date.now()}`);
+            });
+          }
+
+          // First run completes quickly and succeeds
+          if (runId === 0) {
+            await new Promise((resolve) => setTimeout(resolve, 10));
+            return {
+              success: true,
+              output: 'Agent output',
+              duration: 10,
+              testResult: { success: true, output: 'Test passed' },
+              scriptsResults: {},
+            };
+          }
+
+          // Other runs take longer - they should receive abort mid-flight
+          await new Promise((resolve) => setTimeout(resolve, 100));
+
+          // By now, abort should have been called
+          if (options.signal?.aborted) {
+            return {
+              success: false,
+              output: '',
+              error: 'Aborted',
+              duration: 100,
+            };
+          }
+
           return {
-            success,
+            success: true,
             output: 'Agent output',
-            duration: 1000,
-            error: success ? undefined : 'Test failed',
-            testResult: { success, output: success ? 'Test passed' : 'Test failed' },
+            duration: 100,
+            testResult: { success: true, output: 'Test passed' },
             scriptsResults: {},
           };
         }),
@@ -205,7 +326,7 @@ describe('runExperiment', () => {
         agent: 'claude-code',
         model: 'sonnet',
         evals: ['test-eval'],
-        runs: 5,
+        runs: 3,
         earlyExit: true,
         scripts: [],
         timeout: 300,
@@ -228,24 +349,87 @@ describe('runExperiment', () => {
         experimentName: 'test-experiment',
       });
 
-      // Should run twice: first fails, second passes and exits
-      expect(mockAgent.run).toHaveBeenCalledTimes(2);
-      expect(results.evals[0].totalRuns).toBe(2);
-      expect(results.evals[0].passedRuns).toBe(1);
-    });
-  });
+      // All 3 runs should have been called
+      expect(mockAgent.run).toHaveBeenCalledTimes(3);
 
-  describe('multiple fixtures', () => {
-    it('runs all fixtures with early exit behavior per fixture', async () => {
-      let eval2Calls = 0;
+      // But only 1 should be counted (the one that passed)
+      expect(results.evals[0].totalRuns).toBe(1);
+      expect(results.evals[0].passedRuns).toBe(1);
+
+      // The abort event should have fired for all runs that registered a listener
+      // All 3 share the same AbortController, so all get the event
+      expect(abortEvents.length).toBeGreaterThanOrEqual(2); // At minimum the slow runs got it
+    });
+
+    it('does not pass signal when earlyExit is false', async () => {
+      const receivedSignals: (AbortSignal | undefined)[] = [];
 
       const mockAgent: Agent = {
         name: 'mock-agent',
         displayName: 'Mock Agent',
         getApiKeyEnvVar: () => 'MOCK_API_KEY',
         getDefaultModel: () => 'mock-model',
-        run: vi.fn().mockImplementation(async (fixturePath) => {
-          // eval-1 succeeds on first try, eval-2 succeeds on second try
+        run: vi.fn().mockImplementation(async (_fixturePath: string, options: { signal?: AbortSignal }) => {
+          receivedSignals.push(options.signal);
+          return {
+            success: true,
+            output: 'Agent output',
+            duration: 1000,
+            testResult: { success: true, output: 'Test passed' },
+            scriptsResults: {},
+          };
+        }),
+      };
+
+      vi.spyOn(agentsIndex, 'getAgent').mockReturnValue(mockAgent);
+
+      const config: ResolvedExperimentConfig = {
+        agent: 'claude-code',
+        model: 'sonnet',
+        evals: ['test-eval'],
+        runs: 2,
+        earlyExit: false,
+        scripts: [],
+        timeout: 300,
+      };
+
+      const fixtures: EvalFixture[] = [
+        {
+          name: 'test-eval',
+          path: '/fake/path',
+          prompt: 'Test prompt',
+          isModule: true,
+        },
+      ];
+
+      await runExperiment({
+        config,
+        fixtures,
+        apiKey: 'test-key',
+        resultsDir: TEST_DIR,
+        experimentName: 'test-experiment',
+      });
+
+      // No signals should be passed when earlyExit is false
+      expect(receivedSignals.every((s) => s === undefined)).toBe(true);
+    });
+  });
+
+  describe('multiple fixtures', () => {
+    it('runs all fixtures concurrently with independent early exit per fixture', async () => {
+      // Track calls per fixture path
+      const callsByPath = new Map<string, number>();
+
+      const mockAgent: Agent = {
+        name: 'mock-agent',
+        displayName: 'Mock Agent',
+        getApiKeyEnvVar: () => 'MOCK_API_KEY',
+        getDefaultModel: () => 'mock-model',
+        run: vi.fn().mockImplementation(async (fixturePath: string) => {
+          const count = (callsByPath.get(fixturePath) || 0) + 1;
+          callsByPath.set(fixturePath, count);
+
+          // eval-1 always succeeds, eval-2 fails first call then succeeds
           if (fixturePath.includes('eval-1')) {
             return {
               success: true,
@@ -255,8 +439,7 @@ describe('runExperiment', () => {
               scriptsResults: {},
             };
           } else {
-            eval2Calls++;
-            const success = eval2Calls > 1;
+            const success = count > 1;
             return {
               success,
               output: 'Agent output',
@@ -304,11 +487,11 @@ describe('runExperiment', () => {
         experimentName: 'test-experiment',
       });
 
-      // eval-1 should run once (passed first time)
+      // eval-1 should have 1 counted run (first passed)
       expect(results.evals[0].totalRuns).toBe(1);
       expect(results.evals[0].passedRuns).toBe(1);
 
-      // eval-2 should run twice (failed first, passed second)
+      // eval-2 should have 2 counted runs (first failed, second passed)
       expect(results.evals[1].totalRuns).toBe(2);
       expect(results.evals[1].passedRuns).toBe(1);
     });
@@ -338,7 +521,7 @@ describe('runExperiment', () => {
         model: 'opus',
         evals: ['test-eval'],
         runs: 1,
-        earlyExit: true,
+        earlyExit: false, // Use false to avoid signal being passed
         scripts: ['build', 'lint'],
         timeout: 600,
         setup: mockSetup,
@@ -368,6 +551,7 @@ describe('runExperiment', () => {
         apiKey: 'my-api-key',
         setup: mockSetup,
         scripts: ['build', 'lint'],
+        signal: undefined, // No signal when earlyExit is false
       });
     });
   });

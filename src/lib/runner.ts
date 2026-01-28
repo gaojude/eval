@@ -1,5 +1,7 @@
 /**
  * Experiment runner - orchestrates running evals against agent.
+ * All evals and attempts run concurrently for maximum throughput.
+ * With earlyExit, in-flight attempts are aborted when one passes.
  */
 
 import type {
@@ -41,14 +43,32 @@ export interface RunExperimentOptions {
 }
 
 /**
- * Run an experiment - execute all evals with configured runs.
+ * Represents a single eval attempt (fixture + run index).
+ */
+interface EvalAttempt {
+  fixture: EvalFixture;
+  runIndex: number;
+}
+
+/**
+ * Result of a single eval attempt.
+ */
+interface AttemptResult {
+  fixtureName: string;
+  runIndex: number;
+  runData: EvalRunData;
+  aborted?: boolean;
+}
+
+/**
+ * Run an experiment - execute all evals with configured runs concurrently.
+ * With earlyExit enabled, remaining attempts for a fixture are aborted once one passes.
  */
 export async function runExperiment(
   options: RunExperimentOptions
 ): Promise<ExperimentResults> {
   const { config, fixtures, apiKey, resultsDir, experimentName, onProgress, verbose } = options;
   const startedAt = new Date();
-  const evalSummaries: EvalSummary[] = [];
 
   // Get the agent from registry
   const agent = getAgent(config.agent);
@@ -61,29 +81,109 @@ export async function runExperiment(
     }
   };
 
+  // Create AbortController per fixture for earlyExit
+  const abortControllers = new Map<string, AbortController>();
   for (const fixture of fixtures) {
-    const runDataList: EvalRunData[] = [];
+    abortControllers.set(fixture.name, new AbortController());
+  }
 
+  // Build list of all attempts to run
+  const attempts: EvalAttempt[] = [];
+  for (const fixture of fixtures) {
     for (let i = 0; i < config.runs; i++) {
-      log(createProgressDisplay(fixture.name, i + 1, config.runs));
+      attempts.push({ fixture, runIndex: i });
+    }
+  }
 
-      const agentResult = await agent.run(fixture.path, {
-        prompt: fixture.prompt,
-        model: config.model,
-        timeout: config.timeout * 1000, // Convert to milliseconds
-        apiKey,
-        setup: config.setup,
-        scripts: config.scripts,
-      });
+  log(`Starting ${attempts.length} eval attempts concurrently (${fixtures.length} evals × ${config.runs} runs)`);
 
-      const runData = agentResultToEvalRunData(agentResult);
-      runDataList.push(runData);
+  // Run a single attempt
+  const runAttempt = async (attempt: EvalAttempt): Promise<AttemptResult> => {
+    const { fixture, runIndex } = attempt;
+    const controller = abortControllers.get(fixture.name)!;
 
-      log(formatRunResult(fixture.name, i + 1, config.runs, runData.result));
+    // Check if already aborted before starting
+    if (controller.signal.aborted) {
+      return {
+        fixtureName: fixture.name,
+        runIndex,
+        runData: {
+          result: { status: 'failed', error: 'Aborted', duration: 0 },
+        },
+        aborted: true,
+      };
+    }
 
-      // Early exit if configured and we got a pass
-      if (config.earlyExit && runData.result.status === 'passed') {
-        log(`Early exit: ${fixture.name} passed on run ${i + 1}`);
+    log(createProgressDisplay(fixture.name, runIndex + 1, config.runs));
+
+    const agentResult = await agent.run(fixture.path, {
+      prompt: fixture.prompt,
+      model: config.model,
+      timeout: config.timeout * 1000,
+      apiKey,
+      setup: config.setup,
+      scripts: config.scripts,
+      signal: config.earlyExit ? controller.signal : undefined,
+    });
+
+    // Check if this was aborted
+    if (agentResult.error === 'Aborted' || agentResult.error === 'Aborted before start') {
+      return {
+        fixtureName: fixture.name,
+        runIndex,
+        runData: {
+          result: { status: 'failed', error: 'Aborted', duration: agentResult.duration / 1000 },
+        },
+        aborted: true,
+      };
+    }
+
+    const runData = agentResultToEvalRunData(agentResult);
+
+    log(formatRunResult(fixture.name, runIndex + 1, config.runs, runData.result));
+
+    // If this attempt passed and earlyExit is enabled, abort remaining attempts
+    if (config.earlyExit && runData.result.status === 'passed') {
+      log(`Early exit: ${fixture.name} passed on run ${runIndex + 1}, aborting remaining attempts`);
+      controller.abort();
+    }
+
+    return {
+      fixtureName: fixture.name,
+      runIndex,
+      runData,
+    };
+  };
+
+  // Run all attempts concurrently
+  const results = await Promise.all(attempts.map(runAttempt));
+
+  // Group results by fixture, excluding aborted results
+  const resultsByFixture = new Map<string, AttemptResult[]>();
+  for (const fixture of fixtures) {
+    resultsByFixture.set(fixture.name, []);
+  }
+
+  for (const result of results) {
+    if (!result.aborted) {
+      resultsByFixture.get(result.fixtureName)!.push(result);
+    }
+  }
+
+  // Build eval summaries, respecting earlyExit
+  const evalSummaries: EvalSummary[] = [];
+  for (const fixture of fixtures) {
+    const fixtureResults = resultsByFixture.get(fixture.name)!;
+
+    // Sort by run index to process in order
+    fixtureResults.sort((a, b) => a.runIndex - b.runIndex);
+
+    const runDataList: EvalRunData[] = [];
+    for (const result of fixtureResults) {
+      runDataList.push(result.runData);
+
+      // With earlyExit, stop counting after first pass
+      if (config.earlyExit && result.runData.result.status === 'passed') {
         break;
       }
     }
@@ -93,18 +193,18 @@ export async function runExperiment(
   }
 
   const completedAt = new Date();
-  const results = createExperimentResults(config, evalSummaries, startedAt, completedAt);
+  const experimentResults = createExperimentResults(config, evalSummaries, startedAt, completedAt);
 
   // Save results to disk
-  const outputDir = saveResults(results, {
+  const outputDir = saveResults(experimentResults, {
     resultsDir,
     experimentName,
   });
 
   log(`\nResults saved to: ${outputDir}`);
-  log(formatResultsTable(results));
+  log(formatResultsTable(experimentResults));
 
-  return results;
+  return experimentResults;
 }
 
 /**

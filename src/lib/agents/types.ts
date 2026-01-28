@@ -20,6 +20,8 @@ export interface AgentRunOptions {
   setup?: SetupFunction;
   /** npm scripts to run after agent completes */
   scripts?: string[];
+  /** Abort signal to cancel the run */
+  signal?: AbortSignal;
 }
 
 /**
